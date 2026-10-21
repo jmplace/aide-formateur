@@ -512,7 +512,7 @@ function vueSaisie(ev, { focusGrille = false } = {}) {
 
     <h2>Déjà saisis (${ev.reponses.length})</h2>
     <div class="carte">
-      ${ev.reponses.length ? [...ev.reponses].reverse().map(r => `
+      ${ev.reponses.length ? ev.reponses.map(r => `
         <div class="reponse">
           <span><strong>${esc(r.lettre)}</strong> <code>${esc(codeGrille(r.notes, ev))}</code></span>
           <button class="btn petit danger" data-supprimer="${r.id}">Retirer</button>
