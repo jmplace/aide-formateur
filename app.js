@@ -7,7 +7,7 @@
  *   { version: 1, evaluations: [Evaluation] }
  *   Evaluation = { id, titre, date, formateur, echelle, seuil,
  *                  criteres: [{ id, libelle }],
- *                  reponses: [{ id, saisie, notes: { [idCritere]: n | null }, commentaire }] }
+ *                  reponses: [{ id, saisie, notes: { [idCritere]: n | null } }] }
  * Une note null signifie « sans réponse » : elle n'entre pas dans les moyennes.
  */
 
@@ -93,6 +93,58 @@ function statistiques(ev) {
   };
 }
 
+/** Les notes de l'échelle, de la plus haute à la plus basse, comme sur les questionnaires papier. */
+function notesDecroissantes(echelle) {
+  return Array.from({ length: echelle }, (_, i) => echelle - i);
+}
+
+// ---------- Grille saisie au clavier ----------
+//
+// Un caractère par critère, dans l'ordre des critères :
+//   chiffre = note (0 vaut 10 sur l'échelle 1 à 10) ;  - . # = sans réponse ;
+//   *X = X pour tous les critères restants (« *5 » : tout à 5, « 43*5 » : 4, 3 puis 5 partout) ;
+//   les espaces sont ignorés (« 55455 43455 »).
+
+function caractereNote(note) {
+  return note == null ? '-' : note === 10 ? '0' : String(note);
+}
+
+/** Code compact d'une réponse, dans la même syntaxe que la saisie. */
+function codeGrille(notes, ev) {
+  return ev.criteres.map(c => caractereNote(notes[c.id])).join('');
+}
+
+/** Lit une grille ; renvoie { valeurs: [note | null, ...], erreur } (valeurs dans l'ordre des critères). */
+function lireGrille(code, ev) {
+  const s = code.replace(/\s+/g, '');
+  const nb = ev.criteres.length;
+  const valeurs = [];
+  const lireNote = (c) => {
+    if ('-.#'.includes(c)) return null;
+    const n = c === '0' && ev.echelle === 10 ? 10 : Number(c);
+    if (!/^\d$/.test(c) || n < 1 || n > ev.echelle) {
+      throw new Error(`« ${c} » n'est pas une note valide (1 à ${ev.echelle}, ou - pour sans réponse)`);
+    }
+    return n;
+  };
+  try {
+    for (let i = 0; i < s.length; i++) {
+      if (s[i] === '*') {
+        if (i + 1 === s.length) break; // « * » en cours de frappe
+        if (i + 2 < s.length) throw new Error('Rien ne doit suivre « *X »');
+        const n = lireNote(s[i + 1]);
+        while (valeurs.length < nb) valeurs.push(n);
+        break;
+      }
+      if (valeurs.length === nb) throw new Error(`Trop de notes : ${nb} critères seulement`);
+      valeurs.push(lireNote(s[i]));
+    }
+    return { valeurs, erreur: null };
+  } catch (e) {
+    return { valeurs, erreur: e.message };
+  }
+}
+
 // ---------- Mise en forme ----------
 
 function esc(texte) {
@@ -165,13 +217,12 @@ function csv(lignes) {
 }
 
 function exporterReponsesCsv(ev) {
-  const lignes = [['N°', 'Saisi le', ...ev.criteres.map(c => c.libelle), 'Commentaire']];
+  const lignes = [['N°', 'Saisi le', ...ev.criteres.map(c => c.libelle)]];
   ev.reponses.forEach((r, i) => {
     lignes.push([
       i + 1,
       new Date(r.saisie).toLocaleString('fr-FR'),
       ...ev.criteres.map(c => r.notes[c.id] ?? ''),
-      r.commentaire || '',
     ]);
   });
   telecharger(nomFichier(ev, 'reponses', 'csv'), csv(lignes), 'text/csv;charset=utf-8');
@@ -179,7 +230,7 @@ function exporterReponsesCsv(ev) {
 
 function exporterBilanCsv(ev) {
   const st = statistiques(ev);
-  const notes = Array.from({ length: ev.echelle }, (_, i) => i + 1);
+  const notes = notesDecroissantes(ev.echelle);
   const lignes = [
     ['Formation', ev.titre],
     ['Date', fmtDate(ev.date)],
@@ -210,10 +261,6 @@ function bilanTexte(ev) {
     '',
     `Ensemble : ${fmtNombre(st.moyenne)} / ${ev.echelle} — ${fmtPourcent(st.tauxSatisfaction)} de satisfaction`,
   ];
-  const commentaires = ev.reponses.map(r => r.commentaire).filter(Boolean);
-  if (commentaires.length) {
-    lignes.push('', 'Commentaires :', ...commentaires.map(c => `- ${c}`));
-  }
   return lignes.join('\n');
 }
 
@@ -373,10 +420,9 @@ function vueReglages(ev) {
   });
 }
 
-function vueSaisie(ev) {
+function vueSaisie(ev, { focusGrille = false } = {}) {
   // Le questionnaire en cours n'est enregistré qu'à la validation.
-  const notes = {};
-  const resume = (r) => ev.criteres.map(c => r.notes[c.id] ?? '·').join(' ');
+  let notes = {};
 
   app.innerHTML = `
     <h1>${esc(ev.titre)}</h1>
@@ -387,17 +433,21 @@ function vueSaisie(ev) {
         <span class="espace"></span>
         <span class="compteur" id="compteur"></span>
       </div>
+      <label for="grille">Grille complète <span class="aide">(${ev.criteres.length} notes à la suite, ex. ${
+        esc(codeGrille(Object.fromEntries(ev.criteres.map((c, i) => [c.id, ev.echelle - (i % 2)])), ev))
+      } ; *${caractereNote(ev.echelle)} = tout à ${ev.echelle} ; - = sans réponse${ev.echelle === 10 ? ' ; 0 = 10' : ''})</span></label>
+      <input type="text" id="grille" class="grille" inputmode="tel" autocomplete="off" autocapitalize="off" spellcheck="false"
+             enterkeyhint="done" placeholder="Taper la grille puis Entrée">
+      <div class="aide" id="grille-message">&nbsp;</div>
       ${ev.criteres.map(c => `
         <div class="critere" data-critere="${c.id}">
           <div class="libelle">${esc(c.libelle)}</div>
           <div class="notes">
-            ${Array.from({ length: ev.echelle }, (_, i) => i + 1)
+            ${notesDecroissantes(ev.echelle)
               .map(n => `<button type="button" data-note="${n}">${n}</button>`).join('')}
             <button type="button" class="sans" data-note="">Sans</button>
           </div>
         </div>`).join('')}
-      <label for="commentaire">Commentaire <span class="aide">(facultatif)</span></label>
-      <textarea id="commentaire" style="min-height:70px"></textarea>
       <div class="ligne" style="margin-top:14px">
         <button class="btn principal espace" id="valider">Valider ce questionnaire</button>
         <button class="btn" id="effacer">Effacer</button>
@@ -408,18 +458,48 @@ function vueSaisie(ev) {
     <div class="carte">
       ${ev.reponses.length ? [...ev.reponses].reverse().map((r, k) => `
         <div class="reponse">
-          <span><strong>n° ${ev.reponses.length - k}</strong> <code>${esc(resume(r))}</code>${r.commentaire ? ' 💬' : ''}</span>
+          <span><strong>n° ${ev.reponses.length - k}</strong> <code>${esc(codeGrille(r.notes, ev))}</code></span>
           <button class="btn petit danger" data-supprimer="${r.id}">Retirer</button>
         </div>`).join('') : '<p class="meta">Aucun questionnaire saisi.</p>'}
     </div>
   `;
 
   const compteur = document.getElementById('compteur');
-  const majCompteur = () => {
-    const faits = Object.keys(notes).length;
-    compteur.textContent = `${faits} / ${ev.criteres.length} critères`;
+  const grille = document.getElementById('grille');
+  const messageGrille = document.getElementById('grille-message');
+  let erreurGrille = null;
+
+  // Recolore tous les boutons d'après `notes`.
+  const majAffichage = () => {
+    app.querySelectorAll('.critere').forEach(bloc => {
+      const id = bloc.dataset.critere;
+      bloc.querySelectorAll('button[data-note]').forEach(b => {
+        const valeur = b.dataset.note === '' ? null : Number(b.dataset.note);
+        const choisi = id in notes && notes[id] === valeur;
+        b.classList.toggle('choisi', choisi);
+        b.style.background = choisi && valeur != null ? couleurNote(valeur, ev.echelle) : '';
+      });
+    });
+    compteur.textContent = `${Object.keys(notes).length} / ${ev.criteres.length} critères`;
   };
-  majCompteur();
+  majAffichage();
+
+  grille.addEventListener('input', () => {
+    const { valeurs, erreur } = lireGrille(grille.value, ev);
+    erreurGrille = erreur;
+    notes = {};
+    valeurs.forEach((v, i) => { notes[ev.criteres[i].id] = v; });
+    messageGrille.textContent = erreur || (grille.value.trim() ? `${valeurs.length} / ${ev.criteres.length} notes lues` : ' ');
+    messageGrille.classList.toggle('erreur', !!erreur);
+    grille.classList.toggle('erreur', !!erreur);
+    majAffichage();
+  });
+  grille.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      document.getElementById('valider').click();
+    }
+  });
 
   app.querySelectorAll('.critere').forEach(bloc => {
     const id = bloc.dataset.critere;
@@ -427,34 +507,35 @@ function vueSaisie(ev) {
       const bouton = e.target.closest('button[data-note]');
       if (!bouton) return;
       notes[id] = bouton.dataset.note === '' ? null : Number(bouton.dataset.note);
-      bloc.querySelectorAll('button').forEach(b => {
-        b.classList.remove('choisi');
-        b.style.background = '';
-      });
-      bouton.classList.add('choisi');
-      if (notes[id] != null) bouton.style.background = couleurNote(notes[id], ev.echelle);
-      majCompteur();
+      majAffichage();
     });
   });
 
   document.getElementById('valider').addEventListener('click', () => {
-    const commentaire = document.getElementById('commentaire').value.trim();
+    if (erreurGrille && grille.value.trim()) {
+      toast(erreurGrille);
+      grille.focus();
+      return;
+    }
     const manquants = ev.criteres.filter(c => !(c.id in notes)).length;
-    if (manquants === ev.criteres.length && !commentaire) {
+    if (manquants === ev.criteres.length) {
       toast('Le questionnaire est vide.');
       return;
     }
     if (manquants && !confirm(`${manquants} critère(s) sans note : les compter comme « sans réponse » ?`)) return;
     const complet = {};
     for (const c of ev.criteres) complet[c.id] = notes[c.id] ?? null;
-    ev.reponses.push({ id: nouvelId(), saisie: new Date().toISOString(), notes: complet, commentaire });
+    ev.reponses.push({ id: nouvelId(), saisie: new Date().toISOString(), notes: complet });
     enregistrer();
     toast(`Questionnaire n° ${ev.reponses.length} enregistré`);
-    vueSaisie(ev);
-    window.scrollTo(0, 0);
+    // On enchaîne sur le questionnaire suivant, curseur prêt dans la grille.
+    vueSaisie(ev, { focusGrille: true });
   });
 
-  document.getElementById('effacer').addEventListener('click', () => vueSaisie(ev));
+  document.getElementById('effacer').addEventListener('click', () => vueSaisie(ev, { focusGrille: true }));
+
+  window.scrollTo(0, 0);
+  if (focusGrille) grille.focus();
 
   app.querySelectorAll('[data-supprimer]').forEach(b => b.addEventListener('click', () => {
     const i = ev.reponses.findIndex(r => r.id === b.dataset.supprimer);
@@ -468,8 +549,7 @@ function vueSaisie(ev) {
 
 function vueBilan(ev) {
   const st = statistiques(ev);
-  const notesEchelle = Array.from({ length: ev.echelle }, (_, i) => i + 1);
-  const commentaires = ev.reponses.map(r => r.commentaire).filter(Boolean);
+  const notesEchelle = notesDecroissantes(ev.echelle);
 
   app.innerHTML = `
     <h1>${esc(ev.titre)}</h1>
@@ -498,10 +578,6 @@ function vueBilan(ev) {
           ${notesEchelle.map(n => `${n}:${s.repartition[n]}`).join(' ')}
         </div>
       </div>`).join('')}
-
-    ${commentaires.length ? `
-      <h2>Commentaires (${commentaires.length})</h2>
-      <div class="carte"><ul class="commentaires">${commentaires.map(c => `<li>${esc(c)}</li>`).join('')}</ul></div>` : ''}
 
     <h2>Exporter</h2>
     <div class="carte ligne">

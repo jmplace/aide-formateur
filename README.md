@@ -7,10 +7,15 @@ saisie rapide au téléphone, moyennes et taux de satisfaction par critère, exp
 
 - Une **évaluation** par session de formation : intitulé, date, formateur, critères (un par ligne),
   échelle (1–4, 1–5 ou 1–10) et seuil « satisfait à partir de ».
-- **Saisie** questionnaire par questionnaire avec de gros boutons ; « Sans » = pas de réponse
-  (exclu des moyennes) ; commentaire libre ; possibilité de retirer un questionnaire.
+- **Saisie** d'après les questionnaires papier, notes de la plus haute à la plus basse (5 à gauche) :
+  - soit en tapant la **grille complète** puis Entrée, ce qui enchaîne sur le questionnaire suivant :
+    `5545543455` (un chiffre par critère, dans l'ordre), `*5` (tout à 5), `43*5` (4, 3 puis 5 partout),
+    `-` pour « sans réponse », `0` pour 10 sur l'échelle 1 à 10, espaces ignorés ;
+  - soit en touchant les boutons de chaque critère.
+
+  « Sans réponse » est exclu des moyennes ; on peut retirer un questionnaire déjà saisi.
 - **Bilan** : nombre de questionnaires, moyenne et taux de satisfaction globaux et par critère,
-  répartition des notes, commentaires.
+  répartition des notes.
 - **Exports** : bilan copié en texte, bilan CSV, réponses détaillées CSV (format Excel français).
 - **Sauvegarde** JSON exportable / importable. Les données restent sur l'appareil (localStorage).
 - Fonctionne **hors ligne** une fois installée.

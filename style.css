@@ -140,7 +140,7 @@ textarea { min-height: 180px; resize: vertical; }
 }
 .notes button.choisi { color: #fff; border-color: transparent; }
 .notes button.sans { flex: .7; font-size: .85rem; font-weight: 600; color: var(--gris); }
-.notes button.sans.choisi { background: var(--gris); }
+.notes button.sans.choisi { background: var(--gris); color: #fff; }
 
 .compteur { font-size: .95rem; color: var(--gris); }
 
@@ -157,7 +157,6 @@ textarea { min-height: 180px; resize: vertical; }
 .legende { display: flex; gap: 10px; flex-wrap: wrap; font-size: .8rem; color: var(--gris); }
 .pastille { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 3px; vertical-align: -1px; }
 
-.commentaires li { margin-bottom: 6px; }
 
 .reponse { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 8px 0; border-bottom: 1px solid var(--bord); font-size: .9rem; }
 .reponse:last-child { border-bottom: none; }
@@ -175,3 +174,13 @@ textarea { min-height: 180px; resize: vertical; }
   font-size: .9rem;
   z-index: 20;
 }
+
+/* --- Grille saisie au clavier --- */
+input.grille {
+  font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+  font-size: 1.4rem;
+  letter-spacing: 3px;
+}
+input.grille.erreur { border-color: var(--rouge); outline-color: var(--rouge); }
+#grille-message { min-height: 1.2em; margin-top: 4px; }
+#grille-message.erreur { color: var(--rouge); }
