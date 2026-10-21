@@ -480,13 +480,12 @@ function vueNouvelle() {
     criteres: CRITERES_PAR_DEFAUT.map(l => ({ id: nouvelId(), libelle: l })),
     reponses: [],
   };
-  // Reprend les critères et réglages de la dernière évaluation créée, s'il y en a une.
+  // Toujours les critères par défaut ; échelle, seuil et formateur repris de la dernière évaluation.
   const derniere = db.evaluations[db.evaluations.length - 1];
   if (derniere) {
     ev.echelle = derniere.echelle;
     ev.seuil = derniere.seuil;
     ev.formateur = derniere.formateur;
-    ev.criteres = derniere.criteres.map(c => ({ id: nouvelId(), libelle: c.libelle }));
   }
   app.innerHTML = `<h1>Nouvelle évaluation</h1>${formulaireEvaluation(ev, true)}`;
   brancherFormulaire(ev, true);
