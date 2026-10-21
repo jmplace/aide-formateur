@@ -7,7 +7,8 @@
  *   { version: 1, evaluations: [Evaluation] }
  *   Evaluation = { id, titre, date, formateur, nbAttendu (grilles à saisir, ou null), echelle, seuil,
  *                  criteres: [{ id, libelle }],
- *                  reponses: [{ id, saisie, notes: { [idCritere]: n | null } }] }
+ *                  reponses: [{ id, lettre, saisie, notes: { [idCritere]: n | null } }] }
+ * Chaque grille porte une lettre (A, B, … Z, AA, AB…), rangées dans cet ordre.
  * Une note null signifie « pas de note » (tiret sur la grille) : elle n'entre pas dans les moyennes.
  */
 
@@ -30,7 +31,10 @@ function charger() {
     const brut = localStorage.getItem(CLE_STOCKAGE);
     if (brut) {
       const donnees = JSON.parse(brut);
-      if (Array.isArray(donnees.evaluations)) return donnees;
+      if (Array.isArray(donnees.evaluations)) {
+        donnees.evaluations.forEach(normaliser);
+        return donnees;
+      }
     }
   } catch (e) {
     console.error('Lecture des données impossible', e);
@@ -39,6 +43,32 @@ function charger() {
 }
 
 let db = charger();
+
+/** Complète les données d'avant les lettres : A, B, C… dans l'ordre de saisie. */
+function normaliser(ev) {
+  ev.reponses.forEach((r, i) => { if (!r.lettre) r.lettre = lettreGrille(i); });
+  ev.reponses.sort((a, b) => rangLettre(a.lettre) - rangLettre(b.lettre));
+  return ev;
+}
+
+/** 0 → A, 25 → Z, 26 → AA, 27 → AB… */
+function lettreGrille(i) {
+  let s = '';
+  for (let n = i + 1; n > 0; n = Math.floor((n - 1) / 26)) s = String.fromCharCode(65 + (n - 1) % 26) + s;
+  return s;
+}
+
+function rangLettre(lettre) {
+  return [...lettre].reduce((n, c) => n * 26 + c.charCodeAt(0) - 64, 0) - 1;
+}
+
+/** Première lettre libre : après un retrait, la grille retirée est la suivante à ressaisir. */
+function prochaineLettre(ev) {
+  const prises = new Set(ev.reponses.map(r => r.lettre));
+  let i = 0;
+  while (prises.has(lettreGrille(i))) i++;
+  return lettreGrille(i);
+}
 
 function enregistrer() {
   localStorage.setItem(CLE_STOCKAGE, JSON.stringify(db));
@@ -217,10 +247,10 @@ function csv(lignes) {
 }
 
 function exporterReponsesCsv(ev) {
-  const lignes = [['N°', 'Saisi le', ...ev.criteres.map(c => c.libelle)]];
-  ev.reponses.forEach((r, i) => {
+  const lignes = [['Grille', 'Saisie le', ...ev.criteres.map(c => c.libelle)]];
+  ev.reponses.forEach(r => {
     lignes.push([
-      i + 1,
+      r.lettre,
       new Date(r.saisie).toLocaleString('fr-FR'),
       ...ev.criteres.map(c => r.notes[c.id] ?? ''),
     ]);
@@ -446,6 +476,7 @@ function vueReglages(ev) {
 function vueSaisie(ev, { focusGrille = false } = {}) {
   // Le questionnaire en cours n'est enregistré qu'à la validation.
   let notes = {};
+  const lettre = prochaineLettre(ev);
 
   app.innerHTML = `
     <h1>${esc(ev.titre)}</h1>
@@ -453,8 +484,8 @@ function vueSaisie(ev, { focusGrille = false } = {}) {
     ${avancement(ev)}
     <div class="carte">
       <div class="ligne">
-        <strong>Grille n° ${ev.reponses.length + 1}${!ev.nbAttendu ? ''
-          : ev.reponses.length < ev.nbAttendu ? ` / ${ev.nbAttendu}` : ` (au-delà des ${ev.nbAttendu} prévues)`}</strong>
+        <strong>Grille ${lettre}${!ev.nbAttendu ? ''
+          : ev.reponses.length < ev.nbAttendu ? ` (${ev.reponses.length + 1} / ${ev.nbAttendu})` : ` (au-delà des ${ev.nbAttendu} prévues)`}</strong>
         <span class="espace"></span>
         <span class="compteur" id="compteur"></span>
       </div>
@@ -474,16 +505,16 @@ function vueSaisie(ev, { focusGrille = false } = {}) {
           </div>
         </div>`).join('')}
       <div class="ligne" style="margin-top:14px">
-        <button class="btn principal espace" id="valider">Valider ce questionnaire</button>
+        <button class="btn principal espace" id="valider">Valider la grille ${lettre}</button>
         <button class="btn" id="effacer">Effacer</button>
       </div>
     </div>
 
     <h2>Déjà saisis (${ev.reponses.length})</h2>
     <div class="carte">
-      ${ev.reponses.length ? [...ev.reponses].reverse().map((r, k) => `
+      ${ev.reponses.length ? [...ev.reponses].reverse().map(r => `
         <div class="reponse">
-          <span><strong>n° ${ev.reponses.length - k}</strong> <code>${esc(codeGrille(r.notes, ev))}</code></span>
+          <span><strong>${esc(r.lettre)}</strong> <code>${esc(codeGrille(r.notes, ev))}</code></span>
           <button class="btn petit danger" data-supprimer="${r.id}">Retirer</button>
         </div>`).join('') : '<p class="meta">Aucun questionnaire saisi.</p>'}
     </div>
@@ -552,11 +583,12 @@ function vueSaisie(ev, { focusGrille = false } = {}) {
     if (manquants && !confirm(`${manquants} critère(s) non saisi(s) : les compter comme « pas de note » ?`)) return;
     const complet = {};
     for (const c of ev.criteres) complet[c.id] = notes[c.id] ?? null;
-    ev.reponses.push({ id: nouvelId(), saisie: new Date().toISOString(), notes: complet });
+    ev.reponses.push({ id: nouvelId(), lettre, saisie: new Date().toISOString(), notes: complet });
+    normaliser(ev);
     enregistrer();
     toast(ev.nbAttendu && ev.reponses.length === ev.nbAttendu
       ? `Les ${ev.nbAttendu} grilles sont saisies`
-      : `Grille n° ${ev.reponses.length} enregistrée`);
+      : `Grille ${lettre} enregistrée`);
     // On enchaîne sur le questionnaire suivant, curseur prêt dans la grille.
     vueSaisie(ev, { focusGrille: true });
   });
@@ -568,10 +600,10 @@ function vueSaisie(ev, { focusGrille = false } = {}) {
 
   app.querySelectorAll('[data-supprimer]').forEach(b => b.addEventListener('click', () => {
     const i = ev.reponses.findIndex(r => r.id === b.dataset.supprimer);
-    if (i < 0 || !confirm(`Retirer le questionnaire n° ${i + 1} ?`)) return;
-    ev.reponses.splice(i, 1);
+    if (i < 0 || !confirm(`Retirer la grille ${ev.reponses[i].lettre} ? Elle sera la prochaine à ressaisir.`)) return;
+    const [retiree] = ev.reponses.splice(i, 1);
     enregistrer();
-    toast('Questionnaire retiré');
+    toast(`Grille ${retiree.lettre} retirée`);
     vueSaisie(ev);
   }));
 }
@@ -656,7 +688,7 @@ function vueSauvegarde() {
       const donnees = JSON.parse(await fichier.text());
       if (!Array.isArray(donnees.evaluations)) throw new Error('format');
       const valides = donnees.evaluations.filter(ev =>
-        ev && ev.id && Array.isArray(ev.criteres) && Array.isArray(ev.reponses) && ECHELLES.includes(ev.echelle));
+        ev && ev.id && Array.isArray(ev.criteres) && Array.isArray(ev.reponses) && ECHELLES.includes(ev.echelle)).map(normaliser);
       if (!confirm(`Importer ${valides.length} évaluation(s) ?`)) return;
       const ids = new Set(valides.map(ev => ev.id));
       db.evaluations = db.evaluations.filter(ev => !ids.has(ev.id)).concat(valides);

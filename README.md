@@ -15,7 +15,8 @@ saisie rapide au téléphone, moyennes et taux de satisfaction par critère, exp
     `-` pour un critère sans note, `0` pour 10 sur l'échelle 1 à 10, espaces ignorés ;
   - soit en touchant les boutons de chaque critère (« Sans » = pas de note).
 
-  Un critère sans note est exclu des moyennes ; on peut retirer un questionnaire déjà saisi.
+  Les grilles sont nommées **A, B, C… Z** (puis AA, AB…), comme on marque les feuilles papier ;
+  une grille retirée redevient la prochaine à saisir. Un critère sans note est exclu des moyennes.
 - **Bilan** : nombre de questionnaires, moyenne et taux de satisfaction globaux et par critère,
   répartition des notes.
 - **Exports** : bilan copié en texte, bilan CSV, réponses détaillées CSV (format Excel français).
