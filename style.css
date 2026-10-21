@@ -158,9 +158,6 @@ textarea { min-height: 180px; resize: vertical; }
 .pastille { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 3px; vertical-align: -1px; }
 
 
-.reponse { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 8px 0; border-bottom: 1px solid var(--bord); font-size: .9rem; }
-.reponse:last-child { border-bottom: none; }
-.reponse code { font-size: .85rem; letter-spacing: 1px; }
 
 .toast {
   position: fixed;
@@ -175,13 +172,26 @@ textarea { min-height: 180px; resize: vertical; }
   z-index: 20;
 }
 
-/* --- Grille saisie au clavier --- */
+/* --- Zone de saisie : une ligne par grille --- */
+.liste-grilles { position: relative; padding: 6px; max-height: 45vh; overflow-y: auto; }
+.ligne-grille { display: flex; align-items: center; gap: 8px; padding: 4px 6px; border-radius: 8px; cursor: pointer; }
+.ligne-grille + .ligne-grille { margin-top: 2px; }
+.ligne-grille.selection { background: var(--bleu-clair); box-shadow: inset 3px 0 0 var(--bleu); }
+.ligne-grille .lettre { min-width: 2.2em; text-align: center; font-weight: 700; font-size: 1.1rem; }
+.ligne-grille.vide .lettre { color: var(--gris); }
+.ligne-grille .place-bouton { width: 72px; flex: none; }
+.ligne-grille .btn { flex: none; width: 72px; }
 input.grille {
+  flex: 1;
+  min-width: 0;
+  padding: 6px 10px;
   font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
-  font-size: 1.4rem;
+  font-size: 1.25rem;
   letter-spacing: 3px;
 }
-input.grille.erreur { border-color: var(--rouge); outline-color: var(--rouge); }
+input.grille::placeholder { letter-spacing: normal; font-family: system-ui, sans-serif; font-size: .95rem; }
+.ligne-grille.modifiee input.grille { border-color: var(--n2); background: #fff8ef; }
+.ligne-grille.erreur input.grille { border-color: var(--rouge); outline-color: var(--rouge); }
 #grille-message { min-height: 1.2em; margin-top: 4px; }
 #grille-message.erreur { color: var(--rouge); }
 

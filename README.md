@@ -9,14 +9,18 @@ saisie rapide au téléphone, moyennes et taux de satisfaction par critère, exp
   échelle (1–4, 1–5 ou 1–10), seuil « satisfait à partir de » et, si on le connaît, le **nombre de grilles
   à saisir** (questionnaires papier reçus) : la saisie affiche alors l'avancement (« 5 / 12, reste 7 »)
   et demande confirmation au-delà.
-- **Saisie** d'après les questionnaires papier, notes de la plus haute à la plus basse (5 à gauche) :
-  - soit en tapant la **grille complète** puis Entrée, ce qui enchaîne sur le questionnaire suivant :
-    `5545543455` (un chiffre par critère, dans l'ordre), `*5` (tout à 5), `43*5` (4, 3 puis 5 partout),
-    `-` pour un critère sans note, `0` pour 10 sur l'échelle 1 à 10, espaces ignorés ;
-  - soit en touchant les boutons de chaque critère (« Sans » = pas de note).
+- **Saisie** d'après les questionnaires papier, sur un seul écran :
+  - en haut, la zone **Saisie** : une ligne par grille, nommée **A, B, C… Z** (puis AA, AB…) comme on
+    marque les feuilles ; on tape la grille directement sur sa ligne puis Entrée, ce qui enchaîne sur
+    la grille vide suivante. Les grilles prévues mais pas encore saisies apparaissent comme lignes vides.
+    Syntaxe : `5545543455` (un chiffre par critère, dans l'ordre), `*5` (tout à 5), `43*5`
+    (4, 3 puis 5 partout), `-` pour un critère sans note, `0` pour 10 sur l'échelle 1 à 10, espaces ignorés ;
+  - en dessous, le **détail** de la ligne sélectionnée (clic, ou flèches ↑↓) : notes de 5 à 1 par critère
+    (5 à gauche, « Sans » = pas de note), modifiables aux boutons ;
+  - une ligne modifiée apparaît en orange tant qu'elle n'est pas enregistrée (Entrée ou bouton) ;
+    « Annuler » revient à la version enregistrée, « Retirer » supprime la grille, dont la ligne redevient à saisir.
 
-  Les grilles sont nommées **A, B, C… Z** (puis AA, AB…), comme on marque les feuilles papier ;
-  une grille retirée redevient la prochaine à saisir. Un critère sans note est exclu des moyennes.
+  Un critère sans note est exclu des moyennes.
 - **Bilan** : nombre de questionnaires, moyenne et taux de satisfaction globaux et par critère,
   répartition des notes.
 - **Exports** : bilan copié en texte, bilan CSV, réponses détaillées CSV (format Excel français).

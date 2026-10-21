@@ -502,27 +502,66 @@ function vueReglages(ev) {
   });
 }
 
-function vueSaisie(ev, { focusGrille = false } = {}) {
-  // Le questionnaire en cours n'est enregistré qu'à la validation.
-  let notes = {};
-  const lettre = prochaineLettre(ev);
+// Ligne sélectionnée dans la zone de saisie, par évaluation (conservée d'un affichage à l'autre).
+const selectionSaisie = {};
+
+/**
+ * Écran de saisie : en haut, une ligne par grille (A, B, C…) modifiable sur place ;
+ * en dessous, le détail des notes de la ligne sélectionnée, modifiable aux boutons.
+ * Rien n'est enregistré avant validation (Entrée ou bouton).
+ */
+function vueSaisie(ev, { focus = false } = {}) {
+  const parLettre = new Map(ev.reponses.map(r => [r.lettre, r]));
+  const lettres = new Set(parLettre.keys());
+  for (let i = 0; i < (ev.nbAttendu || 0); i++) lettres.add(lettreGrille(i));
+  lettres.add(prochaineLettre(ev));
+  const lignes = [...lettres].sort((a, b) => rangLettre(a) - rangLettre(b));
+
+  if (!lignes.includes(selectionSaisie[ev.id])) selectionSaisie[ev.id] = prochaineLettre(ev);
+  let selection = selectionSaisie[ev.id];
+
+  // Brouillon de chaque ligne : notes en cours d'édition et erreur de lecture éventuelle.
+  const brouillons = {};
+  const brouillon = (l) => brouillons[l] ??= { notes: { ...(parLettre.get(l)?.notes || {}) }, erreur: null };
+
+  /** Code d'un brouillon ; les critères pas encore saisis en fin de grille sont omis. */
+  const codeBrouillon = (notes) => {
+    let dernier = -1;
+    ev.criteres.forEach((c, i) => { if (c.id in notes) dernier = i; });
+    return ev.criteres.slice(0, dernier + 1).map(c => caractereNote(notes[c.id])).join('');
+  };
+
+  const aideSyntaxe = `${ev.criteres.length} notes à la suite, ex. ${
+    esc(codeGrille(Object.fromEntries(ev.criteres.map((c, i) => [c.id, ev.echelle - (i % 2)])), ev))
+  } ; *${caractereNote(ev.echelle)} = tout à ${ev.echelle} ; - = pas de note${ev.echelle === 10 ? ' ; 0 = 10' : ''} ; Entrée pour valider`;
 
   app.innerHTML = `
     <h1>${esc(ev.titre)}</h1>
     ${onglets(ev, 'saisie')}
     ${avancement(ev)}
-    <div class="carte">
+
+    <h2>Saisie (${ev.reponses.length}${ev.nbAttendu ? ` / ${ev.nbAttendu}` : ''})</h2>
+    <p class="aide">${aideSyntaxe}</p>
+    <div class="carte liste-grilles" id="liste-grilles">
+      ${lignes.map(l => {
+        const r = parLettre.get(l);
+        return `<div class="ligne-grille ${r ? '' : 'vide'}" data-lettre="${l}">
+          <span class="lettre">${l}</span>
+          <input type="text" class="grille" data-lettre="${l}" value="${r ? esc(codeGrille(r.notes, ev)) : ''}"
+                 placeholder="${r ? '' : 'à saisir'}" inputmode="tel" autocomplete="off" autocapitalize="off"
+                 spellcheck="false" enterkeyhint="done" aria-label="Grille ${l}">
+          ${r ? `<button type="button" class="btn petit danger" data-retirer="${l}" title="Retirer la grille ${l}">Retirer</button>`
+              : '<span class="place-bouton"></span>'}
+        </div>`;
+      }).join('')}
+    </div>
+
+    <div class="carte" id="detail">
       <div class="ligne">
-        <strong>Grille ${lettre}${!ev.nbAttendu ? ''
-          : ev.reponses.length < ev.nbAttendu ? ` (${ev.reponses.length + 1} / ${ev.nbAttendu})` : ` (au-delà des ${ev.nbAttendu} prévues)`}</strong>
+        <strong id="titre-detail"></strong>
         <span class="espace"></span>
         <span class="compteur" id="compteur"></span>
       </div>
-      <label for="grille">Grille complète <span class="aide">(${ev.criteres.length} notes à la suite, ex. ${
-        esc(codeGrille(Object.fromEntries(ev.criteres.map((c, i) => [c.id, ev.echelle - (i % 2)])), ev))
-      } ; *${caractereNote(ev.echelle)} = tout à ${ev.echelle} ; - = pas de note${ev.echelle === 10 ? ' ; 0 = 10' : ''})</span></label>
-      <input type="text" id="grille" class="grille" inputmode="tel" autocomplete="off" autocapitalize="off" spellcheck="false"
-             enterkeyhint="done" placeholder="Taper la grille puis Entrée">
       <div class="aide" id="grille-message">&nbsp;</div>
       ${ev.criteres.map(c => `
         <div class="critere" data-critere="${c.id}">
@@ -534,28 +573,42 @@ function vueSaisie(ev, { focusGrille = false } = {}) {
           </div>
         </div>`).join('')}
       <div class="ligne" style="margin-top:14px">
-        <button class="btn principal espace" id="valider">Valider la grille ${lettre}</button>
-        <button class="btn" id="effacer">Effacer</button>
+        <button class="btn principal espace" id="valider"></button>
+        <button class="btn" id="annuler" title="Revenir à la version enregistrée">Annuler</button>
       </div>
-    </div>
-
-    <h2>Déjà saisis (${ev.reponses.length})</h2>
-    <div class="carte">
-      ${ev.reponses.length ? ev.reponses.map(r => `
-        <div class="reponse">
-          <span><strong>${esc(r.lettre)}</strong> <code>${esc(codeGrille(r.notes, ev))}</code></span>
-          <button class="btn petit danger" data-supprimer="${r.id}">Retirer</button>
-        </div>`).join('') : '<p class="meta">Aucun questionnaire saisi.</p>'}
     </div>
   `;
 
-  const compteur = document.getElementById('compteur');
-  const grille = document.getElementById('grille');
+  const champ = (l) => app.querySelector(`input.grille[data-lettre="${l}"]`);
+  const ligne = (l) => app.querySelector(`.ligne-grille[data-lettre="${l}"]`);
   const messageGrille = document.getElementById('grille-message');
-  let erreurGrille = null;
+  const liste = document.getElementById('liste-grilles');
 
-  // Recolore tous les boutons d'après `notes`.
+  /** Fait défiler la liste (et elle seule) pour rendre la ligne visible. */
+  const montrer = (l) => {
+    const d = ligne(l);
+    if (d.offsetTop < liste.scrollTop) liste.scrollTop = d.offsetTop - 6;
+    else if (d.offsetTop + d.offsetHeight > liste.scrollTop + liste.clientHeight) {
+      liste.scrollTop = d.offsetTop + d.offsetHeight - liste.clientHeight + 6;
+    }
+  };
+
+  /** Met à jour le détail (boutons, compteur, message) et l'état des lignes. */
   const majAffichage = () => {
+    const { notes, erreur } = brouillon(selection);
+    const enregistree = parLettre.get(selection);
+    app.querySelectorAll('.ligne-grille').forEach(div => {
+      const l = div.dataset.lettre;
+      div.classList.toggle('selection', l === selection);
+      const r = parLettre.get(l);
+      const b = brouillons[l];
+      div.classList.toggle('modifiee', !!b && (r ? codeBrouillon(b.notes) !== codeGrille(r.notes, ev) : Object.keys(b.notes).length > 0));
+      div.classList.toggle('erreur', !!b?.erreur);
+    });
+    document.getElementById('titre-detail').textContent =
+      `Grille ${selection}${enregistree ? '' : ' — nouvelle'}`;
+    document.getElementById('valider').textContent =
+      enregistree ? `Enregistrer la grille ${selection}` : `Valider la grille ${selection}`;
     app.querySelectorAll('.critere').forEach(bloc => {
       const id = bloc.dataset.critere;
       bloc.querySelectorAll('button[data-note]').forEach(b => {
@@ -565,76 +618,130 @@ function vueSaisie(ev, { focusGrille = false } = {}) {
         b.style.background = choisi && valeur != null ? couleurNote(valeur, ev.echelle) : '';
       });
     });
-    compteur.textContent = `${Object.keys(notes).length} / ${ev.criteres.length} critères`;
-  };
-  majAffichage();
-
-  grille.addEventListener('input', () => {
-    const { valeurs, erreur } = lireGrille(grille.value, ev);
-    erreurGrille = erreur;
-    notes = {};
-    valeurs.forEach((v, i) => { notes[ev.criteres[i].id] = v; });
-    messageGrille.textContent = erreur || (grille.value.trim() ? `${valeurs.length} / ${ev.criteres.length} notes lues` : ' ');
+    const nbNotes = Object.keys(notes).length;
+    document.getElementById('compteur').textContent = `${nbNotes} / ${ev.criteres.length} critères`;
+    messageGrille.textContent = erreur || ' ';
     messageGrille.classList.toggle('erreur', !!erreur);
-    grille.classList.toggle('erreur', !!erreur);
+  };
+
+  const selectionner = (l) => {
+    if (l === selection) return;
+    selection = selectionSaisie[ev.id] = l;
     majAffichage();
-  });
-  grille.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      document.getElementById('valider').click();
+    montrer(l);
+  };
+
+  /** Ligne à proposer après la validation de `l` : la première grille vide qui suit, sinon la prochaine lettre. */
+  const ligneSuivante = (l) => {
+    const prises = new Set(ev.reponses.map(r => r.lettre));
+    const vide = lignes.find(x => rangLettre(x) > rangLettre(l) && !prises.has(x));
+    return vide || prochaineLettre(ev);
+  };
+
+  const valider = async (l) => {
+    const { notes, erreur } = brouillon(l);
+    const r = parLettre.get(l);
+    if (erreur) {
+      toast(erreur);
+      champ(l).focus();
+      return;
     }
+    const manquants = ev.criteres.filter(c => !(c.id in notes)).length;
+    if (manquants === ev.criteres.length) {
+      toast(r ? 'Grille vide : utilisez « Retirer » pour la supprimer.' : 'La grille est vide.');
+      return;
+    }
+    if (!r && ev.nbAttendu && ev.reponses.length >= ev.nbAttendu &&
+        !await confirmer(`Les ${ev.nbAttendu} grilles prévues sont déjà saisies. Enregistrer quand même la grille ${l} ?`, { ok: 'Enregistrer' })) return;
+    if (manquants && !await confirmer(`Grille ${l} : ${manquants} critère(s) non saisi(s), les compter comme « pas de note » ?`, { ok: 'Oui, sans note' })) return;
+    const complet = {};
+    for (const c of ev.criteres) complet[c.id] = notes[c.id] ?? null;
+    if (r) {
+      r.notes = complet;
+      r.modification = new Date().toISOString();
+    } else {
+      ev.reponses.push({ id: nouvelId(), lettre: l, saisie: new Date().toISOString(), notes: complet });
+      normaliser(ev);
+    }
+    enregistrer();
+    toast(r ? `Grille ${l} modifiée`
+      : ev.nbAttendu && ev.reponses.length === ev.nbAttendu ? `Les ${ev.nbAttendu} grilles sont saisies`
+      : `Grille ${l} enregistrée`);
+    // On enchaîne sur la grille suivante, curseur prêt.
+    selectionSaisie[ev.id] = ligneSuivante(l);
+    vueSaisie(ev, { focus: true });
+  };
+
+  // --- Lignes de la zone de saisie ---
+  app.querySelectorAll('.ligne-grille').forEach(div => {
+    const l = div.dataset.lettre;
+    div.addEventListener('click', (e) => {
+      if (e.target.closest('button')) return;
+      selectionner(l);
+      if (e.target.tagName !== 'INPUT') champ(l).focus();
+    });
+  });
+  app.querySelectorAll('input.grille').forEach(input => {
+    const l = input.dataset.lettre;
+    input.addEventListener('focus', () => selectionner(l));
+    input.addEventListener('input', () => {
+      const { valeurs, erreur } = lireGrille(input.value, ev);
+      const notes = {};
+      valeurs.forEach((v, i) => { notes[ev.criteres[i].id] = v; });
+      brouillons[l] = { notes, erreur };
+      selectionner(l);
+      majAffichage();
+    });
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        valider(l);
+      } else if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+        // Flèches : passer d'une ligne à l'autre.
+        e.preventDefault();
+        const voisine = lignes[lignes.indexOf(l) + (e.key === 'ArrowDown' ? 1 : -1)];
+        if (voisine) champ(voisine).focus();
+      }
+    });
   });
 
+  app.querySelectorAll('[data-retirer]').forEach(b => b.addEventListener('click', async () => {
+    const l = b.dataset.retirer;
+    if (!await confirmer(`Retirer la grille ${l} ? Elle redeviendra à saisir.`, { ok: 'Retirer', danger: true })) return;
+    ev.reponses = ev.reponses.filter(r => r.lettre !== l);
+    enregistrer();
+    toast(`Grille ${l} retirée`);
+    selectionSaisie[ev.id] = l;
+    vueSaisie(ev);
+  }));
+
+  // --- Détail : les boutons modifient la ligne sélectionnée ---
   app.querySelectorAll('.critere').forEach(bloc => {
     const id = bloc.dataset.critere;
     bloc.addEventListener('click', (e) => {
       const bouton = e.target.closest('button[data-note]');
       if (!bouton) return;
-      notes[id] = bouton.dataset.note === '' ? null : Number(bouton.dataset.note);
+      const b = brouillon(selection);
+      b.notes[id] = bouton.dataset.note === '' ? null : Number(bouton.dataset.note);
+      b.erreur = null;
+      champ(selection).value = codeBrouillon(b.notes);
       majAffichage();
     });
   });
 
-  document.getElementById('valider').addEventListener('click', async () => {
-    if (erreurGrille && grille.value.trim()) {
-      toast(erreurGrille);
-      grille.focus();
-      return;
-    }
-    const manquants = ev.criteres.filter(c => !(c.id in notes)).length;
-    if (manquants === ev.criteres.length) {
-      toast('Le questionnaire est vide.');
-      return;
-    }
-    if (ev.nbAttendu && ev.reponses.length >= ev.nbAttendu &&
-        !await confirmer(`Les ${ev.nbAttendu} grilles prévues sont déjà saisies. Enregistrer quand même la grille ${lettre} ?`, { ok: 'Enregistrer' })) return;
-    if (manquants && !await confirmer(`${manquants} critère(s) non saisi(s) : les compter comme « pas de note » ?`, { ok: 'Oui, sans note' })) return;
-    const complet = {};
-    for (const c of ev.criteres) complet[c.id] = notes[c.id] ?? null;
-    ev.reponses.push({ id: nouvelId(), lettre, saisie: new Date().toISOString(), notes: complet });
-    normaliser(ev);
-    enregistrer();
-    toast(ev.nbAttendu && ev.reponses.length === ev.nbAttendu
-      ? `Les ${ev.nbAttendu} grilles sont saisies`
-      : `Grille ${lettre} enregistrée`);
-    // On enchaîne sur le questionnaire suivant, curseur prêt dans la grille.
-    vueSaisie(ev, { focusGrille: true });
+  document.getElementById('valider').addEventListener('click', () => valider(selection));
+  document.getElementById('annuler').addEventListener('click', () => {
+    delete brouillons[selection];
+    const r = parLettre.get(selection);
+    champ(selection).value = r ? codeGrille(r.notes, ev) : '';
+    majAffichage();
+    champ(selection).focus();
   });
 
-  document.getElementById('effacer').addEventListener('click', () => vueSaisie(ev, { focusGrille: true }));
-
+  majAffichage();
   window.scrollTo(0, 0);
-  if (focusGrille) grille.focus();
-
-  app.querySelectorAll('[data-supprimer]').forEach(b => b.addEventListener('click', async () => {
-    const i = ev.reponses.findIndex(r => r.id === b.dataset.supprimer);
-    if (i < 0 || !await confirmer(`Retirer la grille ${ev.reponses[i].lettre} ? Elle sera la prochaine à ressaisir.`, { ok: 'Retirer', danger: true })) return;
-    const [retiree] = ev.reponses.splice(i, 1);
-    enregistrer();
-    toast(`Grille ${retiree.lettre} retirée`);
-    vueSaisie(ev);
-  }));
+  montrer(selection);
+  if (focus) champ(selection).focus({ preventScroll: true });
 }
 
 function vueBilan(ev) {
