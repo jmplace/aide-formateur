@@ -217,6 +217,35 @@ function toast(message) {
   minuteurToast = setTimeout(() => { el.hidden = true; }, 2200);
 }
 
+/**
+ * Demande de confirmation dans l'appli plutôt que par la boîte native du navigateur :
+ * certains navigateurs intégrés ne l'affichent pas et répondent « Annuler » d'office.
+ */
+function confirmer(message, { ok = 'Confirmer', danger = false } = {}) {
+  return new Promise(resolve => {
+    const d = document.createElement('dialog');
+    d.className = 'dialogue';
+    d.innerHTML = `<p>${esc(message)}</p>
+      <div class="ligne">
+        <span class="espace"></span>
+        <button type="button" class="btn" value="non">Annuler</button>
+        <button type="button" class="btn ${danger ? 'danger' : 'principal'}" value="oui">${esc(ok)}</button>
+      </div>`;
+    d.addEventListener('click', (e) => {
+      const bouton = e.target.closest('button');
+      if (bouton) d.close(bouton.value);
+    });
+    d.addEventListener('close', () => {
+      d.remove();
+      resolve(d.returnValue === 'oui');
+    });
+    document.body.appendChild(d);
+    d.showModal();
+    // Entrée valide directement, sauf pour les actions destructrices.
+    d.querySelector(danger ? '[value=non]' : '[value=oui]').focus();
+  });
+}
+
 function telecharger(nomFichier, contenu, type) {
   const url = URL.createObjectURL(new Blob([contenu], { type }));
   const a = document.createElement('a');
@@ -392,7 +421,7 @@ function brancherFormulaire(ev, estNouvelle) {
   remplirSeuils(ev.seuil);
   echelle.addEventListener('change', () => remplirSeuils(SEUIL_PAR_DEFAUT[echelle.value]));
 
-  document.getElementById('form-eval').addEventListener('submit', (e) => {
+  document.getElementById('form-eval').addEventListener('submit', async (e) => {
     e.preventDefault();
     const libelles = document.getElementById('f-criteres').value
       .split('\n').map(s => s.trim()).filter(Boolean);
@@ -402,7 +431,7 @@ function brancherFormulaire(ev, estNouvelle) {
     }
     const supprimes = ev.criteres.filter(c => !libelles.includes(c.libelle));
     if (!estNouvelle && supprimes.length && ev.reponses.length &&
-        !confirm(`Supprimer ${supprimes.length} critère(s) et les notes déjà saisies pour ${supprimes.length > 1 ? 'eux' : 'lui'} ?`)) {
+        !await confirmer(`Supprimer ${supprimes.length} critère(s) et les notes déjà saisies pour ${supprimes.length > 1 ? 'eux' : 'lui'} ?`, { ok: 'Supprimer', danger: true })) {
       return;
     }
 
@@ -464,8 +493,8 @@ function vueReglages(ev) {
     </div>
   `;
   brancherFormulaire(ev, false);
-  document.getElementById('supprimer').addEventListener('click', () => {
-    if (!confirm(`Supprimer « ${ev.titre} » et ses ${ev.reponses.length} questionnaire(s) ? Cette action est définitive.`)) return;
+  document.getElementById('supprimer').addEventListener('click', async () => {
+    if (!await confirmer(`Supprimer « ${ev.titre} » et ses ${ev.reponses.length} grille(s) ? Cette action est définitive.`, { ok: 'Supprimer', danger: true })) return;
     db.evaluations = db.evaluations.filter(e => e.id !== ev.id);
     enregistrer();
     toast('Évaluation supprimée');
@@ -567,7 +596,7 @@ function vueSaisie(ev, { focusGrille = false } = {}) {
     });
   });
 
-  document.getElementById('valider').addEventListener('click', () => {
+  document.getElementById('valider').addEventListener('click', async () => {
     if (erreurGrille && grille.value.trim()) {
       toast(erreurGrille);
       grille.focus();
@@ -579,8 +608,8 @@ function vueSaisie(ev, { focusGrille = false } = {}) {
       return;
     }
     if (ev.nbAttendu && ev.reponses.length >= ev.nbAttendu &&
-        !confirm(`Les ${ev.nbAttendu} grilles prévues sont déjà saisies. Enregistrer quand même celle-ci ?`)) return;
-    if (manquants && !confirm(`${manquants} critère(s) non saisi(s) : les compter comme « pas de note » ?`)) return;
+        !await confirmer(`Les ${ev.nbAttendu} grilles prévues sont déjà saisies. Enregistrer quand même la grille ${lettre} ?`, { ok: 'Enregistrer' })) return;
+    if (manquants && !await confirmer(`${manquants} critère(s) non saisi(s) : les compter comme « pas de note » ?`, { ok: 'Oui, sans note' })) return;
     const complet = {};
     for (const c of ev.criteres) complet[c.id] = notes[c.id] ?? null;
     ev.reponses.push({ id: nouvelId(), lettre, saisie: new Date().toISOString(), notes: complet });
@@ -598,9 +627,9 @@ function vueSaisie(ev, { focusGrille = false } = {}) {
   window.scrollTo(0, 0);
   if (focusGrille) grille.focus();
 
-  app.querySelectorAll('[data-supprimer]').forEach(b => b.addEventListener('click', () => {
+  app.querySelectorAll('[data-supprimer]').forEach(b => b.addEventListener('click', async () => {
     const i = ev.reponses.findIndex(r => r.id === b.dataset.supprimer);
-    if (i < 0 || !confirm(`Retirer la grille ${ev.reponses[i].lettre} ? Elle sera la prochaine à ressaisir.`)) return;
+    if (i < 0 || !await confirmer(`Retirer la grille ${ev.reponses[i].lettre} ? Elle sera la prochaine à ressaisir.`, { ok: 'Retirer', danger: true })) return;
     const [retiree] = ev.reponses.splice(i, 1);
     enregistrer();
     toast(`Grille ${retiree.lettre} retirée`);
@@ -689,7 +718,7 @@ function vueSauvegarde() {
       if (!Array.isArray(donnees.evaluations)) throw new Error('format');
       const valides = donnees.evaluations.filter(ev =>
         ev && ev.id && Array.isArray(ev.criteres) && Array.isArray(ev.reponses) && ECHELLES.includes(ev.echelle)).map(normaliser);
-      if (!confirm(`Importer ${valides.length} évaluation(s) ?`)) return;
+      if (!await confirmer(`Importer ${valides.length} évaluation(s) ?`, { ok: 'Importer' })) return;
       const ids = new Set(valides.map(ev => ev.id));
       db.evaluations = db.evaluations.filter(ev => !ids.has(ev.id)).concat(valides);
       enregistrer();

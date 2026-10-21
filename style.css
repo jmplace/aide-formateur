@@ -194,3 +194,14 @@ input.grille.erreur { border-color: var(--rouge); outline-color: var(--rouge); }
 .avancement.depasse { color: var(--rouge); }
 .avancement.depasse .jauge span { background: var(--rouge); }
 .chiffre small { font-size: .9rem; color: var(--gris); font-weight: 600; }
+
+/* --- Fenêtre de confirmation --- */
+dialog.dialogue {
+  width: min(92vw, 420px);
+  border: none;
+  border-radius: var(--rayon);
+  padding: 18px 18px 14px;
+  box-shadow: 0 10px 30px rgba(0,0,0,.3);
+}
+dialog.dialogue::backdrop { background: rgba(0,0,0,.4); }
+dialog.dialogue p { margin: 0 0 16px; line-height: 1.4; }
