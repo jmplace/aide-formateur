@@ -28,7 +28,7 @@ saisie rapide au téléphone, moyennes et taux de satisfaction par critère, exp
 - **Bilan** : nombre de grilles, moyenne et taux de satisfaction globaux et par critère,
   répartition des notes, et **vue 3D** (barres sur un plan critères × grilles, hauteur = note ;
   glisser pour tourner, survol ou toucher pour le détail).
-- Couleurs des notes : rouge (basses) → gris (milieu) → bleu (hautes), lisibles par les daltoniens.
+- Couleurs des notes : rouge (basses) → jaune → vert (hautes).
 - **Exports** : bilan copié en texte, bilan CSV, réponses détaillées CSV (format Excel français).
 - **Sauvegarde** JSON exportable / importable. Les données restent sur l'appareil (localStorage).
 - Fonctionne **hors ligne** une fois installée.

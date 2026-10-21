@@ -215,10 +215,10 @@ function fmtDate(iso) {
 }
 
 /*
- * Couleurs des notes : palette divergente rouge (notes basses) → gris neutre → bleu (notes hautes),
- * vérifiée pour le daltonisme. On projette l'échelle (1–4, 1–5, 1–10) sur ces 5 teintes.
+ * Couleurs des notes : rouge (notes basses) → jaune → vert (notes hautes).
+ * On projette l'échelle (1–4, 1–5, 1–10) sur ces 5 teintes.
  */
-const COULEURS_NOTES = ['#b42d2d', '#e66767', '#c9c8c2', '#5598e7', '#1c5cab'];
+const COULEURS_NOTES = ['#c0392b', '#e67e22', '#f1c40f', '#7cb342', '#2e8540'];
 
 function indiceCouleur(note, echelle) {
   return Math.round((note - 1) * 4 / (echelle - 1));
@@ -228,7 +228,7 @@ function couleurNote(note, echelle) {
   return COULEURS_NOTES[indiceCouleur(note, echelle)];
 }
 
-/** Texte lisible sur la couleur d'une note (foncé sur le gris neutre, blanc ailleurs). */
+/** Texte lisible sur la couleur d'une note (foncé sur le jaune, blanc ailleurs). */
 function encreSurNote(note, echelle) {
   return indiceCouleur(note, echelle) === 2 ? 'var(--texte)' : '#fff';
 }
