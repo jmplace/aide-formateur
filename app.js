@@ -16,12 +16,16 @@ const CLE_STOCKAGE = 'aide-formateur.v1';
 const ECHELLES = [4, 5, 10];
 const SEUIL_PAR_DEFAUT = { 4: 3, 5: 4, 10: 7 };
 const CRITERES_PAR_DEFAUT = [
-  'Atteinte des objectifs de la formation',
-  'Contenu et supports',
-  'Qualité de l\'animation',
-  'Rythme et durée',
-  'Organisation et conditions matérielles',
-  'Satisfaction globale',
+  'Les informations pratiques données avant la formation ont été suffisantes',
+  'La présentation et l\'objectif de la journée ont été clairs',
+  'La journée m\'a permis de connaître le projet Restos',
+  'La formation m\'a permis de connaître les dispositifs d\'aide à la personne mis en place aux Restos',
+  'La formation m\'a permis de comprendre ce qu\'est un bon accueil aux Restos',
+  'La formation me permettra de pratiquer une écoute au service des personnes accueillies',
+  'La formation m\'a permis de comprendre la diversité des personnes accueillies et de leurs besoins',
+  'La formation m\'a permis de me sentir capable d\'aider à l\'expression des besoins des personnes accueillies afin de les orienter vers les bons interlocuteurs, activités Restos ou autres structures',
+  'La formation m\'a permis de comprendre l\'importance de l\'équipe aux Restos',
+  'En fin de journée, la formation a répondu à mes attentes',
 ];
 
 // ---------- Stockage ----------
@@ -398,8 +402,12 @@ function formulaireEvaluation(ev, estNouvelle) {
       </div>
       ${verrouEchelle ? '<p class="aide">L\'échelle ne peut plus changer : des questionnaires sont déjà saisis.</p>' : ''}
 
-      <label for="f-criteres">Critères évalués <span class="aide">(un par ligne)</span></label>
-      <textarea id="f-criteres">${esc(ev.criteres.map(c => c.libelle).join('\n'))}</textarea>
+      <div class="ligne" style="margin-top:14px">
+        <label for="f-criteres" style="margin:0">Critères évalués <span class="aide">(un par ligne)</span></label>
+        <span class="espace"></span>
+        <button type="button" class="btn petit" id="criteres-defaut">Critères par défaut</button>
+      </div>
+      <textarea id="f-criteres" style="margin-top:6px">${esc(ev.criteres.map(c => c.libelle).join('\n'))}</textarea>
       ${verrouEchelle ? '<p class="aide">Supprimer un critère efface aussi ses notes déjà saisies.</p>' : ''}
 
       <div class="ligne" style="margin-top:16px">
@@ -412,6 +420,9 @@ function formulaireEvaluation(ev, estNouvelle) {
 
 function brancherFormulaire(ev, estNouvelle) {
   const echelle = document.getElementById('f-echelle');
+  document.getElementById('criteres-defaut').addEventListener('click', () => {
+    document.getElementById('f-criteres').value = CRITERES_PAR_DEFAUT.join('\n');
+  });
   const seuil = document.getElementById('f-seuil');
   const remplirSeuils = (valeur) => {
     const max = Number(echelle.value);

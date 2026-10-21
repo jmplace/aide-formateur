@@ -105,7 +105,7 @@ input[type=text], input[type=date], input[type=number], select, textarea {
   font: inherit;
   background: #fff;
 }
-textarea { min-height: 180px; resize: vertical; }
+textarea { min-height: 300px; resize: vertical; }
 
 .onglets { display: flex; gap: 6px; margin-bottom: 16px; }
 .onglets a {
