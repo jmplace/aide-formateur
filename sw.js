@@ -1,6 +1,6 @@
 // Service worker : met l'appli en cache pour qu'elle fonctionne hors ligne.
 // Changer VERSION à chaque mise en ligne pour forcer la mise à jour des fichiers.
-const VERSION = 'v2';
+const VERSION = 'v3';
 const CACHE = `aide-formateur-${VERSION}`;
 const FICHIERS = [
   './',

@@ -139,7 +139,7 @@ textarea { min-height: 180px; resize: vertical; }
   cursor: pointer;
 }
 .notes button.choisi { color: #fff; border-color: transparent; }
-.notes button.sans { flex: .7; font-size: .85rem; font-weight: 600; color: var(--gris); }
+.notes button.sans { flex: .7; color: var(--gris); }
 .notes button.sans.choisi { background: var(--gris); color: #fff; }
 
 .compteur { font-size: .95rem; color: var(--gris); }
@@ -184,3 +184,13 @@ input.grille {
 input.grille.erreur { border-color: var(--rouge); outline-color: var(--rouge); }
 #grille-message { min-height: 1.2em; margin-top: 4px; }
 #grille-message.erreur { color: var(--rouge); }
+
+/* --- Avancement de la saisie --- */
+.avancement { margin-bottom: 12px; font-size: .95rem; font-weight: 600; color: var(--bleu); }
+.avancement .jauge { height: 8px; border-radius: 4px; background: var(--bord); overflow: hidden; margin-bottom: 4px; }
+.avancement .jauge span { display: block; height: 100%; background: var(--bleu); }
+.avancement.termine { color: var(--vert); }
+.avancement.termine .jauge span { background: var(--vert); }
+.avancement.depasse { color: var(--rouge); }
+.avancement.depasse .jauge span { background: var(--rouge); }
+.chiffre small { font-size: .9rem; color: var(--gris); font-weight: 600; }

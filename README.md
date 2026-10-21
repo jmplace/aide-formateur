@@ -6,14 +6,16 @@ saisie rapide au téléphone, moyennes et taux de satisfaction par critère, exp
 ## Fonctionnalités
 
 - Une **évaluation** par session de formation : intitulé, date, formateur, critères (un par ligne),
-  échelle (1–4, 1–5 ou 1–10) et seuil « satisfait à partir de ».
+  échelle (1–4, 1–5 ou 1–10), seuil « satisfait à partir de » et, si on le connaît, le **nombre de grilles
+  à saisir** (questionnaires papier reçus) : la saisie affiche alors l'avancement (« 5 / 12, reste 7 »)
+  et demande confirmation au-delà.
 - **Saisie** d'après les questionnaires papier, notes de la plus haute à la plus basse (5 à gauche) :
   - soit en tapant la **grille complète** puis Entrée, ce qui enchaîne sur le questionnaire suivant :
     `5545543455` (un chiffre par critère, dans l'ordre), `*5` (tout à 5), `43*5` (4, 3 puis 5 partout),
-    `-` pour « sans réponse », `0` pour 10 sur l'échelle 1 à 10, espaces ignorés ;
-  - soit en touchant les boutons de chaque critère.
+    `-` pour un critère sans note, `0` pour 10 sur l'échelle 1 à 10, espaces ignorés ;
+  - soit en touchant les boutons de chaque critère (« – » = pas de note).
 
-  « Sans réponse » est exclu des moyennes ; on peut retirer un questionnaire déjà saisi.
+  Un critère sans note est exclu des moyennes ; on peut retirer un questionnaire déjà saisi.
 - **Bilan** : nombre de questionnaires, moyenne et taux de satisfaction globaux et par critère,
   répartition des notes.
 - **Exports** : bilan copié en texte, bilan CSV, réponses détaillées CSV (format Excel français).

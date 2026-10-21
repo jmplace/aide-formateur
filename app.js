@@ -5,10 +5,10 @@
  *
  * Toutes les données restent sur l'appareil (localStorage), sous la forme :
  *   { version: 1, evaluations: [Evaluation] }
- *   Evaluation = { id, titre, date, formateur, echelle, seuil,
+ *   Evaluation = { id, titre, date, formateur, nbAttendu (grilles à saisir, ou null), echelle, seuil,
  *                  criteres: [{ id, libelle }],
  *                  reponses: [{ id, saisie, notes: { [idCritere]: n | null } }] }
- * Une note null signifie « sans réponse » : elle n'entre pas dans les moyennes.
+ * Une note null signifie « pas de note » (tiret sur la grille) : elle n'entre pas dans les moyennes.
  */
 
 const CLE_STOCKAGE = 'aide-formateur.v1';
@@ -101,7 +101,7 @@ function notesDecroissantes(echelle) {
 // ---------- Grille saisie au clavier ----------
 //
 // Un caractère par critère, dans l'ordre des critères :
-//   chiffre = note (0 vaut 10 sur l'échelle 1 à 10) ;  - . # = sans réponse ;
+//   chiffre = note (0 vaut 10 sur l'échelle 1 à 10) ;  - . # = pas de note ;
 //   *X = X pour tous les critères restants (« *5 » : tout à 5, « 43*5 » : 4, 3 puis 5 partout) ;
 //   les espaces sont ignorés (« 55455 43455 »).
 
@@ -123,7 +123,7 @@ function lireGrille(code, ev) {
     if ('-.#'.includes(c)) return null;
     const n = c === '0' && ev.echelle === 10 ? 10 : Number(c);
     if (!/^\d$/.test(c) || n < 1 || n > ev.echelle) {
-      throw new Error(`« ${c} » n'est pas une note valide (1 à ${ev.echelle}, ou - pour sans réponse)`);
+      throw new Error(`« ${c} » n'est pas une note valide (1 à ${ev.echelle}, ou - pour pas de note)`);
     }
     return n;
   };
@@ -235,7 +235,8 @@ function exporterBilanCsv(ev) {
     ['Formation', ev.titre],
     ['Date', fmtDate(ev.date)],
     ['Formateur', ev.formateur || ''],
-    ['Questionnaires', st.nbQuestionnaires],
+    ['Grilles saisies', st.nbQuestionnaires],
+    ['Grilles à saisir', ev.nbAttendu || ''],
     ['Échelle', `1 à ${ev.echelle}`],
     ['Satisfait à partir de', ev.seuil],
     [],
@@ -254,7 +255,7 @@ function bilanTexte(ev) {
   const lignes = [
     `Bilan de satisfaction — ${ev.titre}`,
     [fmtDate(ev.date), ev.formateur].filter(Boolean).join(' — '),
-    `${st.nbQuestionnaires} questionnaire(s), échelle 1 à ${ev.echelle}, satisfait à partir de ${ev.seuil}`,
+    `${st.nbQuestionnaires}${ev.nbAttendu ? ` / ${ev.nbAttendu}` : ''} questionnaire(s), échelle 1 à ${ev.echelle}, satisfait à partir de ${ev.seuil}`,
     '',
     ...st.parCritere.map(s =>
       `• ${s.critere.libelle} : ${fmtNombre(s.moyenne)} / ${ev.echelle} (${fmtPourcent(s.tauxSatisfaction)} satisfaits, ${s.n} rép.)`),
@@ -267,6 +268,23 @@ function bilanTexte(ev) {
 // ---------- Vues ----------
 
 const app = document.getElementById('app');
+
+/** Bandeau d'avancement de la saisie, si le nombre de grilles à saisir est connu. */
+function avancement(ev) {
+  const attendu = ev.nbAttendu;
+  if (!attendu) return '';
+  const faits = ev.reponses.length;
+  const etat = faits < attendu ? '' : faits === attendu ? 'termine' : 'depasse';
+  const texte = faits < attendu
+    ? `${faits} / ${attendu} grilles saisies — reste ${attendu - faits}`
+    : faits === attendu
+      ? `Les ${attendu} grilles sont saisies ✓`
+      : `${faits} grilles saisies pour ${attendu} prévues (${faits - attendu} de trop ?)`;
+  return `<div class="avancement ${etat}">
+    <div class="jauge"><span style="width:${Math.min(100, 100 * faits / attendu)}%"></span></div>
+    <div>${texte}</div>
+  </div>`;
+}
 
 function onglets(ev, actif) {
   const o = (cle, libelle) =>
@@ -283,7 +301,7 @@ function vueAccueil() {
       return `<a class="carte" href="#/eval/${ev.id}/saisie">
         <div><strong>${esc(ev.titre)}</strong></div>
         <div class="meta">${esc(fmtDate(ev.date))}${ev.formateur ? ' — ' + esc(ev.formateur) : ''}</div>
-        <div class="meta">${st.nbQuestionnaires} questionnaire(s) · moyenne ${fmtNombre(st.moyenne)} / ${ev.echelle} · ${fmtPourcent(st.tauxSatisfaction)} satisfaits</div>
+        <div class="meta">${st.nbQuestionnaires}${ev.nbAttendu ? ` / ${ev.nbAttendu}` : ''} grille(s) · moyenne ${fmtNombre(st.moyenne)} / ${ev.echelle} · ${fmtPourcent(st.tauxSatisfaction)} satisfaits</div>
       </a>`;
     }).join('') : '<p class="vide">Aucune évaluation pour l\'instant.<br>Créez-en une pour commencer la saisie.</p>'}
     <a class="btn principal flottant" href="#/nouvelle">+ Nouvelle évaluation</a>
@@ -303,6 +321,9 @@ function formulaireEvaluation(ev, estNouvelle) {
 
       <label for="f-formateur">Formateur <span class="aide">(facultatif)</span></label>
       <input type="text" id="f-formateur" value="${esc(ev.formateur)}">
+
+      <label for="f-attendu">Nombre de grilles à saisir <span class="aide">(facultatif : nombre de questionnaires papier reçus)</span></label>
+      <input type="number" id="f-attendu" min="1" step="1" inputmode="numeric" value="${ev.nbAttendu || ''}">
 
       <div class="ligne">
         <div class="espace">
@@ -366,6 +387,7 @@ function brancherFormulaire(ev, estNouvelle) {
     ev.titre = document.getElementById('f-titre').value.trim();
     ev.date = document.getElementById('f-date').value;
     ev.formateur = document.getElementById('f-formateur').value.trim();
+    ev.nbAttendu = Math.max(0, Math.floor(Number(document.getElementById('f-attendu').value))) || null;
     if (!ev.reponses.length) ev.echelle = Number(echelle.value);
     ev.seuil = Number(seuil.value);
 
@@ -384,6 +406,7 @@ function vueNouvelle() {
     formateur: '',
     echelle: 5,
     seuil: SEUIL_PAR_DEFAUT[5],
+    nbAttendu: null,
     criteres: CRITERES_PAR_DEFAUT.map(l => ({ id: nouvelId(), libelle: l })),
     reponses: [],
   };
@@ -427,15 +450,17 @@ function vueSaisie(ev, { focusGrille = false } = {}) {
   app.innerHTML = `
     <h1>${esc(ev.titre)}</h1>
     ${onglets(ev, 'saisie')}
+    ${avancement(ev)}
     <div class="carte">
       <div class="ligne">
-        <strong>Questionnaire n° ${ev.reponses.length + 1}</strong>
+        <strong>Grille n° ${ev.reponses.length + 1}${!ev.nbAttendu ? ''
+          : ev.reponses.length < ev.nbAttendu ? ` / ${ev.nbAttendu}` : ` (au-delà des ${ev.nbAttendu} prévues)`}</strong>
         <span class="espace"></span>
         <span class="compteur" id="compteur"></span>
       </div>
       <label for="grille">Grille complète <span class="aide">(${ev.criteres.length} notes à la suite, ex. ${
         esc(codeGrille(Object.fromEntries(ev.criteres.map((c, i) => [c.id, ev.echelle - (i % 2)])), ev))
-      } ; *${caractereNote(ev.echelle)} = tout à ${ev.echelle} ; - = sans réponse${ev.echelle === 10 ? ' ; 0 = 10' : ''})</span></label>
+      } ; *${caractereNote(ev.echelle)} = tout à ${ev.echelle} ; - = pas de note${ev.echelle === 10 ? ' ; 0 = 10' : ''})</span></label>
       <input type="text" id="grille" class="grille" inputmode="tel" autocomplete="off" autocapitalize="off" spellcheck="false"
              enterkeyhint="done" placeholder="Taper la grille puis Entrée">
       <div class="aide" id="grille-message">&nbsp;</div>
@@ -445,7 +470,7 @@ function vueSaisie(ev, { focusGrille = false } = {}) {
           <div class="notes">
             ${notesDecroissantes(ev.echelle)
               .map(n => `<button type="button" data-note="${n}">${n}</button>`).join('')}
-            <button type="button" class="sans" data-note="">Sans</button>
+            <button type="button" class="sans" data-note="" title="Pas de note">–</button>
           </div>
         </div>`).join('')}
       <div class="ligne" style="margin-top:14px">
@@ -522,12 +547,16 @@ function vueSaisie(ev, { focusGrille = false } = {}) {
       toast('Le questionnaire est vide.');
       return;
     }
-    if (manquants && !confirm(`${manquants} critère(s) sans note : les compter comme « sans réponse » ?`)) return;
+    if (ev.nbAttendu && ev.reponses.length >= ev.nbAttendu &&
+        !confirm(`Les ${ev.nbAttendu} grilles prévues sont déjà saisies. Enregistrer quand même celle-ci ?`)) return;
+    if (manquants && !confirm(`${manquants} critère(s) non saisi(s) : les compter comme « pas de note » ?`)) return;
     const complet = {};
     for (const c of ev.criteres) complet[c.id] = notes[c.id] ?? null;
     ev.reponses.push({ id: nouvelId(), saisie: new Date().toISOString(), notes: complet });
     enregistrer();
-    toast(`Questionnaire n° ${ev.reponses.length} enregistré`);
+    toast(ev.nbAttendu && ev.reponses.length === ev.nbAttendu
+      ? `Les ${ev.nbAttendu} grilles sont saisies`
+      : `Grille n° ${ev.reponses.length} enregistrée`);
     // On enchaîne sur le questionnaire suivant, curseur prêt dans la grille.
     vueSaisie(ev, { focusGrille: true });
   });
@@ -555,7 +584,7 @@ function vueBilan(ev) {
     <h1>${esc(ev.titre)}</h1>
     ${onglets(ev, 'bilan')}
     <div class="chiffres">
-      <div class="chiffre"><div class="valeur">${st.nbQuestionnaires}</div><div class="nom">questionnaires</div></div>
+      <div class="chiffre"><div class="valeur">${st.nbQuestionnaires}${ev.nbAttendu ? `<small> / ${ev.nbAttendu}</small>` : ''}</div><div class="nom">grilles</div></div>
       <div class="chiffre"><div class="valeur">${fmtNombre(st.moyenne)}</div><div class="nom">moyenne / ${ev.echelle}</div></div>
       <div class="chiffre"><div class="valeur">${fmtPourcent(st.tauxSatisfaction)}</div><div class="nom">satisfaits (≥ ${ev.seuil})</div></div>
     </div>
