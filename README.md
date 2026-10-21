@@ -13,7 +13,7 @@ saisie rapide au téléphone, moyennes et taux de satisfaction par critère, exp
   - soit en tapant la **grille complète** puis Entrée, ce qui enchaîne sur le questionnaire suivant :
     `5545543455` (un chiffre par critère, dans l'ordre), `*5` (tout à 5), `43*5` (4, 3 puis 5 partout),
     `-` pour un critère sans note, `0` pour 10 sur l'échelle 1 à 10, espaces ignorés ;
-  - soit en touchant les boutons de chaque critère (« – » = pas de note).
+  - soit en touchant les boutons de chaque critère (« Sans » = pas de note).
 
   Un critère sans note est exclu des moyennes ; on peut retirer un questionnaire déjà saisi.
 - **Bilan** : nombre de questionnaires, moyenne et taux de satisfaction globaux et par critère,

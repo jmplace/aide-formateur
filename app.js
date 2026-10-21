@@ -470,7 +470,7 @@ function vueSaisie(ev, { focusGrille = false } = {}) {
           <div class="notes">
             ${notesDecroissantes(ev.echelle)
               .map(n => `<button type="button" data-note="${n}">${n}</button>`).join('')}
-            <button type="button" class="sans" data-note="" title="Pas de note">–</button>
+            <button type="button" class="sans" data-note="" title="Pas de note">Sans</button>
           </div>
         </div>`).join('')}
       <div class="ligne" style="margin-top:14px">
