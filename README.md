@@ -23,8 +23,12 @@ saisie rapide au téléphone, moyennes et taux de satisfaction par critère, exp
     « Annuler » revient à la version enregistrée, « Retirer » supprime la grille, dont la ligne redevient à saisir.
 
   Un critère sans note est exclu des moyennes.
-- **Bilan** : nombre de questionnaires, moyenne et taux de satisfaction globaux et par critère,
-  répartition des notes.
+- **Comptage** : pour chaque critère, une grille à deux lignes : les notes (5 4 3 2 1 Sans) en haut,
+  le nombre de grilles qui les ont données en dessous ; plus une grille de total.
+- **Bilan** : nombre de grilles, moyenne et taux de satisfaction globaux et par critère,
+  répartition des notes, et **vue 3D** (barres sur un plan critères × grilles, hauteur = note ;
+  glisser pour tourner, survol ou toucher pour le détail).
+- Couleurs des notes : rouge (basses) → gris (milieu) → bleu (hautes), lisibles par les daltoniens.
 - **Exports** : bilan copié en texte, bilan CSV, réponses détaillées CSV (format Excel français).
 - **Sauvegarde** JSON exportable / importable. Les données restent sur l'appareil (localStorage).
 - Fonctionne **hors ligne** une fois installée.
@@ -50,6 +54,7 @@ menu ⋮ → **Installer l'application**.
 |---|---|
 | `index.html`, `style.css` | Coquille et mise en page |
 | `app.js` | Données, calculs (`statistiques`), vues et exports |
+| `barres3d.js` | Vue 3D du bilan (canvas, sans bibliothèque) |
 | `sw.js` | Cache hors ligne — incrémenter `VERSION` à chaque mise en ligne |
 | `manifest.webmanifest`, `icons/` | Installation (nom, icônes, couleurs) |
 | `tools/make-icons.js` | Régénère les icônes PNG |

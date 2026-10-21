@@ -1,12 +1,13 @@
 // Service worker : met l'appli en cache pour qu'elle fonctionne hors ligne.
 // Changer VERSION à chaque mise en ligne pour forcer la mise à jour des fichiers.
-const VERSION = 'v12';
+const VERSION = 'v14';
 const CACHE = `aide-formateur-${VERSION}`;
 const FICHIERS = [
   './',
   'index.html',
   'style.css',
   'app.js',
+  'barres3d.js',
   'manifest.webmanifest',
   'icons/icon-192.png',
   'icons/icon-512.png',

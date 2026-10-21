@@ -214,10 +214,23 @@ function fmtDate(iso) {
   return `${j}/${m}/${a}`;
 }
 
-/** Couleur d'une note : on projette l'échelle sur les 5 teintes rouge → vert. */
+/*
+ * Couleurs des notes : palette divergente rouge (notes basses) → gris neutre → bleu (notes hautes),
+ * vérifiée pour le daltonisme. On projette l'échelle (1–4, 1–5, 1–10) sur ces 5 teintes.
+ */
+const COULEURS_NOTES = ['#b42d2d', '#e66767', '#c9c8c2', '#5598e7', '#1c5cab'];
+
+function indiceCouleur(note, echelle) {
+  return Math.round((note - 1) * 4 / (echelle - 1));
+}
+
 function couleurNote(note, echelle) {
-  const i = Math.round(1 + (note - 1) * 4 / (echelle - 1));
-  return `var(--n${i})`;
+  return COULEURS_NOTES[indiceCouleur(note, echelle)];
+}
+
+/** Texte lisible sur la couleur d'une note (foncé sur le gris neutre, blanc ailleurs). */
+function encreSurNote(note, echelle) {
+  return indiceCouleur(note, echelle) === 2 ? 'var(--texte)' : '#fff';
 }
 
 function aujourdhui() {
@@ -365,7 +378,7 @@ function avancement(ev) {
 function onglets(ev, actif) {
   const o = (cle, libelle) =>
     `<a href="#/eval/${ev.id}/${cle}" class="${cle === actif ? 'actif' : ''}">${libelle}</a>`;
-  return `<nav class="onglets">${o('saisie', 'Saisie')}${o('bilan', 'Bilan')}${o('reglages', 'Réglages')}</nav>`;
+  return `<nav class="onglets">${o('saisie', 'Saisie')}${o('comptage', 'Comptage')}${o('bilan', 'Bilan')}${o('reglages', 'Réglages')}</nav>`;
 }
 
 function vueAccueil() {
@@ -671,6 +684,7 @@ function vueSaisie(ev, { focus = false } = {}) {
         const choisi = id in notes && notes[id] === valeur;
         b.classList.toggle('choisi', choisi);
         b.style.background = choisi && valeur != null ? couleurNote(valeur, ev.echelle) : '';
+        b.style.color = choisi && valeur != null ? encreSurNote(valeur, ev.echelle) : '';
       });
     });
     const nbNotes = Object.keys(notes).length;
@@ -799,6 +813,50 @@ function vueSaisie(ev, { focus = false } = {}) {
   if (focus) champ(selection).focus({ preventScroll: true });
 }
 
+function vueComptage(ev) {
+  const st = statistiques(ev);
+  const notes = notesDecroissantes(ev.echelle);
+  const sans = (s) => st.nbQuestionnaires - s.n;
+
+  /** Grille à deux lignes : valeurs (fixes, en couleur) en haut, nombres en dessous. */
+  const grille = (nombres, nbSans) => `
+    <table class="grille-comptage">
+      <tr class="valeurs">
+        ${notes.map(n => `<th style="background:${couleurNote(n, ev.echelle)};color:${encreSurNote(n, ev.echelle)}">${n}</th>`).join('')}
+        <th class="sans">Sans</th>
+      </tr>
+      <tr class="nombres">
+        ${notes.map(n => `<td class="${nombres[n] ? '' : 'zero'}">${nombres[n]}</td>`).join('')}
+        <td class="${nbSans ? '' : 'zero'}">${nbSans}</td>
+      </tr>
+    </table>`;
+
+  const totaux = {};
+  for (const n of notes) totaux[n] = st.parCritere.reduce((t, s) => t + s.repartition[n], 0);
+
+  app.innerHTML = `
+    <h1>${esc(ev.titre)}</h1>
+    ${onglets(ev, 'comptage')}
+    <p class="aide">Pour chaque critère : la note en haut, le nombre de grilles qui l'ont donnée en dessous
+      (${st.nbQuestionnaires} grille(s)).</p>
+    ${st.parCritere.map((s, i) => `
+      <div class="carte comptage-critere">
+        <div class="entete">
+          <span><strong>${i + 1}.</strong> ${esc(s.critere.libelle)}</span>
+          <span class="moy">${fmtNombre(s.moyenne)}</span>
+        </div>
+        ${grille(s.repartition, sans(s))}
+      </div>`).join('')}
+    <div class="carte comptage-critere total">
+      <div class="entete">
+        <strong>Total, tous critères</strong>
+        <span class="moy">${fmtNombre(st.moyenne)}</span>
+      </div>
+      ${grille(totaux, st.parCritere.reduce((t, s) => t + sans(s), 0))}
+    </div>
+  `;
+}
+
 function vueBilan(ev) {
   const st = statistiques(ev);
   const notesEchelle = notesDecroissantes(ev.echelle);
@@ -831,6 +889,22 @@ function vueBilan(ev) {
         </div>
       </div>`).join('')}
 
+    <h2>Vue 3D : critères × grilles</h2>
+    ${ev.reponses.length ? `
+      <div class="carte">
+        <div class="ligne">
+          <div class="legende">
+            ${notesEchelle.map(n => `<span><i class="pastille" style="background:${couleurNote(n, ev.echelle)}"></i>${n}</span>`).join('')}
+            <span><i class="pastille pastille-vide"></i>Sans</span>
+          </div>
+          <span class="espace"></span>
+          <button type="button" class="btn petit" id="vue3d-reinit">Recentrer</button>
+        </div>
+        <div class="barres3d" id="vue3d"></div>
+        <p class="aide">Hauteur = note. Colonnes : critères 1 à ${ev.criteres.length} ; lignes : grilles ${esc(ev.reponses[0].lettre)} à ${esc(ev.reponses[ev.reponses.length - 1].lettre)}.
+          Glisser pour tourner ; survoler ou toucher une barre pour le détail. Le tableau chiffré est dans l'onglet Comptage.</p>
+      </div>` : '<p class="aide">Aucune grille saisie.</p>'}
+
     <h2>Exporter</h2>
     <div class="carte ligne">
       <button class="btn" id="copier">Copier le bilan</button>
@@ -850,6 +924,21 @@ function vueBilan(ev) {
       else prompt('Copiez le bilan :', texte);
     }
   });
+  const zone3d = document.getElementById('vue3d');
+  if (zone3d) {
+    const vue = new Barres3D(zone3d, {
+      colonnes: ev.criteres.map((c, i) => String(i + 1)),
+      lignes: ev.reponses.map(r => r.lettre),
+      valeurs: ev.reponses.map(r => ev.criteres.map(c => r.notes[c.id] ?? null)),
+      max: ev.echelle,
+      couleur: (note) => couleurNote(note, ev.echelle),
+      infobulle: (l, c) => {
+        const note = ev.reponses[l].notes[ev.criteres[c].id];
+        return `Grille ${ev.reponses[l].lettre} · critère ${c + 1} : ${note == null ? 'sans note' : `${note} / ${ev.echelle}`}\n${ev.criteres[c].libelle}`;
+      },
+    });
+    document.getElementById('vue3d-reinit').addEventListener('click', () => vue.reinitialiser());
+  }
   document.getElementById('csv-bilan').addEventListener('click', () => exporterBilanCsv(ev));
   document.getElementById('csv-reponses').addEventListener('click', () => exporterReponsesCsv(ev));
 }
@@ -978,6 +1067,7 @@ function router() {
     const ev = trouverEvaluation(morceaux[1]);
     if (ev) {
       if (morceaux[2] === 'bilan') return vueBilan(ev);
+      if (morceaux[2] === 'comptage') return vueComptage(ev);
       if (morceaux[2] === 'reglages') return vueReglages(ev);
       return vueSaisie(ev);
     }
