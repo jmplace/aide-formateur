@@ -211,7 +211,8 @@ class Barres3D {
         const dx = e.clientX - glisse.x, dy = e.clientY - glisse.y;
         if (Math.abs(dx) + Math.abs(dy) > 4) glisse.bouge = true;
         if (glisse.bouge) {
-          this.angle = glisse.angle + dx * 0.01;
+          // On « attrape » le plan : il suit le curseur (glisser à gauche fait tourner l’avant vers la gauche).
+          this.angle = glisse.angle - dx * 0.01;
           this.inclinaison = Math.min(85, Math.max(15, glisse.inclinaison * 180 / Math.PI + dy * 0.4)) * Math.PI / 180;
           this.bulle.hidden = true;
           this.survol = null;
