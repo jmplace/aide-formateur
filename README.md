@@ -23,8 +23,8 @@ saisie rapide au téléphone, moyennes et taux de satisfaction par critère, exp
     « Annuler » revient à la version enregistrée, « Retirer » supprime la grille, dont la ligne redevient à saisir.
 
   Un critère sans note est exclu des moyennes.
-- **Comptage** : pour chaque critère, une grille à deux lignes : les notes (5 4 3 2 1 Sans) en haut,
-  le nombre de grilles qui les ont données en dessous ; plus une grille de total.
+- **Comptage** : tableau une ligne par critère, une colonne par note (5 à 1) : nombre de grilles
+  ayant donné cette note.
 - **Bilan** : nombre de grilles, moyenne et taux de satisfaction globaux et par critère,
   répartition des notes, et **vue 3D** (barres sur un plan critères × grilles, hauteur = note ;
   glisser pour tourner, survol ou toucher pour le détail).

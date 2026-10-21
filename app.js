@@ -816,43 +816,28 @@ function vueSaisie(ev, { focus = false } = {}) {
 function vueComptage(ev) {
   const st = statistiques(ev);
   const notes = notesDecroissantes(ev.echelle);
-  const sans = (s) => st.nbQuestionnaires - s.n;
 
-  /** Grille à deux lignes : valeurs (fixes, en couleur) en haut, nombres en dessous. */
-  const grille = (nombres, nbSans) => `
-    <table class="grille-comptage">
-      <tr class="valeurs">
-        ${notes.map(n => `<th style="background:${couleurNote(n, ev.echelle)};color:${encreSurNote(n, ev.echelle)}">${n}</th>`).join('')}
-        <th class="sans">Sans</th>
-      </tr>
-      <tr class="nombres">
-        ${notes.map(n => `<td class="${nombres[n] ? '' : 'zero'}">${nombres[n]}</td>`).join('')}
-        <td class="${nbSans ? '' : 'zero'}">${nbSans}</td>
-      </tr>
-    </table>`;
-
-  const totaux = {};
-  for (const n of notes) totaux[n] = st.parCritere.reduce((t, s) => t + s.repartition[n], 0);
-
+  // Une ligne par critère, une colonne par note : nombre de grilles ayant donné cette note.
   app.innerHTML = `
     <h1>${esc(ev.titre)}</h1>
     ${onglets(ev, 'comptage')}
-    <p class="aide">Pour chaque critère : la note en haut, le nombre de grilles qui l'ont donnée en dessous
-      (${st.nbQuestionnaires} grille(s)).</p>
-    ${st.parCritere.map((s, i) => `
-      <div class="carte comptage-critere">
-        <div class="entete">
-          <span><strong>${i + 1}.</strong> ${esc(s.critere.libelle)}</span>
-          <span class="moy">${fmtNombre(s.moyenne)}</span>
-        </div>
-        ${grille(s.repartition, sans(s))}
-      </div>`).join('')}
-    <div class="carte comptage-critere total">
-      <div class="entete">
-        <strong>Total, tous critères</strong>
-        <span class="moy">${fmtNombre(st.moyenne)}</span>
-      </div>
-      ${grille(totaux, st.parCritere.reduce((t, s) => t + sans(s), 0))}
+    <p class="aide">Nombre de grilles ayant donné chaque note, critère par critère (${st.nbQuestionnaires} grille(s)).</p>
+    <div class="carte tableau-defilant">
+      <table class="comptage">
+        <thead>
+          <tr>
+            <th class="lib">Critère</th>
+            ${notes.map(n => `<th class="nb" style="background:${couleurNote(n, ev.echelle)};color:${encreSurNote(n, ev.echelle)}">${n}</th>`).join('')}
+          </tr>
+        </thead>
+        <tbody>
+          ${st.parCritere.map((s, i) => `
+            <tr>
+              <td class="lib"><strong>${i + 1}.</strong> ${esc(s.critere.libelle)}</td>
+              ${notes.map(n => `<td class="nb ${s.repartition[n] ? '' : 'zero'}">${s.repartition[n]}</td>`).join('')}
+            </tr>`).join('')}
+        </tbody>
+      </table>
     </div>
   `;
 }

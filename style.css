@@ -223,23 +223,18 @@ dialog.dialogue p { margin: 0 0 16px; line-height: 1.4; }
 }
 select.choix-modele { width: auto; max-width: 60%; padding: 6px 10px; font-weight: 600; }
 
-/* --- Comptage : une grille à deux lignes par critère --- */
-.comptage-critere .entete { display: flex; justify-content: space-between; gap: 10px; align-items: baseline; margin-bottom: 8px; }
-.comptage-critere .moy { font-weight: 700; white-space: nowrap; }
-.comptage-critere.total { border-width: 2px; }
-table.grille-comptage { width: 100%; border-collapse: separate; border-spacing: 3px 0; table-layout: fixed; }
-table.grille-comptage th, table.grille-comptage td { text-align: center; padding: 5px 0; }
-table.grille-comptage tr.valeurs th { border-radius: 6px 6px 0 0; font-size: .95rem; }
-table.grille-comptage tr.valeurs th.sans { background: #fff; color: var(--gris); border: 1px dashed var(--gris); border-bottom: none; font-size: .8rem; }
-table.grille-comptage tr.nombres td {
-  border: 1px solid var(--bord);
-  border-top: none;
-  border-radius: 0 0 6px 6px;
-  font-size: 1.2rem;
-  font-weight: 700;
-  font-variant-numeric: tabular-nums;
-}
-table.grille-comptage tr.nombres td.zero { color: var(--bord); font-weight: 400; }
+/* --- Comptage : tableau critères × notes --- */
+.tableau-defilant { overflow-x: auto; padding: 6px; }
+table.comptage { width: 100%; border-collapse: separate; border-spacing: 0; font-size: .9rem; }
+table.comptage th, table.comptage td { padding: 8px 4px; border-bottom: 1px solid var(--bord); }
+table.comptage thead th { font-size: 1rem; }
+table.comptage thead th.nb:nth-child(2) { border-top-left-radius: 6px; }
+table.comptage thead th.nb:last-child { border-top-right-radius: 6px; }
+table.comptage .lib { text-align: left; }
+table.comptage .nb { text-align: center; width: 2.8em; font-variant-numeric: tabular-nums; }
+table.comptage td.nb { font-size: 1.1rem; font-weight: 700; }
+table.comptage td.zero { color: var(--bord); font-weight: 400; }
+table.comptage tbody tr:hover { background: var(--bleu-clair); }
 
 /* --- Vue 3D --- */
 .barres3d { position: relative; margin-top: 8px; touch-action: none; }
