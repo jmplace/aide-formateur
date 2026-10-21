@@ -4,8 +4,10 @@
  * Aide formateur — comptage des questionnaires de satisfaction.
  *
  * Toutes les données restent sur l'appareil (localStorage), sous la forme :
- *   { version: 1, evaluations: [Evaluation] }
- *   Evaluation = { id, titre, date, formateur, nbAttendu (grilles à saisir, ou null), echelle, seuil,
+ *   { version: 1, modeles: [Modele], evaluations: [Evaluation] }
+ *   Modele = { id, nom, criteres: [libellé] }   — bibliothèque des formations et de leurs critères
+ *   Evaluation = { id, formation (nom du modèle choisi, ou ''), titre, date, formateur,
+ *                  nbAttendu (grilles à saisir, ou null), echelle, seuil,
  *                  criteres: [{ id, libelle }],
  *                  reponses: [{ id, lettre, saisie, notes: { [idCritere]: n | null } }] }
  * Chaque grille porte une lettre (A, B, … Z, AA, AB…), rangées dans cet ordre.
@@ -15,7 +17,9 @@
 const CLE_STOCKAGE = 'aide-formateur.v1';
 const ECHELLES = [4, 5, 10];
 const SEUIL_PAR_DEFAUT = { 4: 3, 5: 4, 10: 7 };
-const CRITERES_PAR_DEFAUT = [
+// Formation proposée dans la bibliothèque au premier lancement.
+const MODELE_INITIAL_NOM = 'PAAP';
+const MODELE_INITIAL_CRITERES = [
   'Les informations pratiques données avant la formation ont été suffisantes',
   'La présentation et l\'objectif de la journée ont été clairs',
   'La journée m\'a permis de connaître le projet Restos',
@@ -37,13 +41,22 @@ function charger() {
       const donnees = JSON.parse(brut);
       if (Array.isArray(donnees.evaluations)) {
         donnees.evaluations.forEach(normaliser);
+        if (!Array.isArray(donnees.modeles)) donnees.modeles = modelesInitiaux();
         return donnees;
       }
     }
   } catch (e) {
     console.error('Lecture des données impossible', e);
   }
-  return { version: 1, evaluations: [] };
+  return { version: 1, modeles: modelesInitiaux(), evaluations: [] };
+}
+
+function modelesInitiaux() {
+  return [{ id: nouvelId(), nom: MODELE_INITIAL_NOM, criteres: [...MODELE_INITIAL_CRITERES] }];
+}
+
+function modelesTries() {
+  return [...db.modeles].sort((a, b) => a.nom.localeCompare(b.nom, 'fr'));
 }
 
 let db = charger();
@@ -297,7 +310,7 @@ function exporterBilanCsv(ev) {
   const lignes = [
     ['Formation', ev.titre],
     ['Date', fmtDate(ev.date)],
-    ['Formateur', ev.formateur || ''],
+    ['Formateurs', ev.formateur || ''],
     ['Grilles saisies', st.nbQuestionnaires],
     ['Grilles à saisir', ev.nbAttendu || ''],
     ['Échelle', `1 à ${ev.echelle}`],
@@ -363,7 +376,7 @@ function vueAccueil() {
       const st = statistiques(ev);
       return `<a class="carte" href="#/eval/${ev.id}/saisie">
         <div><strong>${esc(ev.titre)}</strong></div>
-        <div class="meta">${esc(fmtDate(ev.date))}${ev.formateur ? ' — ' + esc(ev.formateur) : ''}</div>
+        <div class="meta">${ev.formation ? `<span class="etiquette">${esc(ev.formation)}</span> ` : ''}${esc(fmtDate(ev.date))}${ev.formateur ? ' — ' + esc(ev.formateur) : ''}</div>
         <div class="meta">${st.nbQuestionnaires}${ev.nbAttendu ? ` / ${ev.nbAttendu}` : ''} grille(s) · moyenne ${fmtNombre(st.moyenne)} / ${ev.echelle} · ${fmtPourcent(st.tauxSatisfaction)} satisfaits</div>
       </a>`;
     }).join('') : '<p class="vide">Aucune évaluation pour l\'instant.<br>Créez-en une pour commencer la saisie.</p>'}
@@ -376,13 +389,16 @@ function formulaireEvaluation(ev, estNouvelle) {
   const verrouEchelle = ev.reponses.length > 0;
   return `
     <form id="form-eval" class="carte">
-      <label for="f-titre">Intitulé de la formation</label>
-      <input type="text" id="f-titre" required value="${esc(ev.titre)}" placeholder="ex. Excel perfectionnement — groupe B">
+      ${estNouvelle ? ''
+        : `<p style="margin:0"><strong>Formation :</strong> ${ev.formation ? esc(ev.formation) : '<span class="aide">non précisée</span>'}</p>`}
+
+      <label for="f-titre">Intitulé de la session</label>
+      <input type="text" id="f-titre" required value="${esc(ev.titre)}" placeholder="ex. PAAP — Lyon, groupe du matin">
 
       <label for="f-date">Date</label>
       <input type="date" id="f-date" value="${esc(ev.date)}">
 
-      <label for="f-formateur">Formateur <span class="aide">(facultatif)</span></label>
+      <label for="f-formateur">Formateurs <span class="aide">(facultatif)</span></label>
       <input type="text" id="f-formateur" value="${esc(ev.formateur)}">
 
       <label for="f-attendu">Nombre de grilles à saisir <span class="aide">(facultatif : nombre de questionnaires papier reçus)</span></label>
@@ -402,12 +418,22 @@ function formulaireEvaluation(ev, estNouvelle) {
       </div>
       ${verrouEchelle ? '<p class="aide">L\'échelle ne peut plus changer : des questionnaires sont déjà saisis.</p>' : ''}
 
-      <div class="ligne" style="margin-top:14px">
-        <label for="f-criteres" style="margin:0">Critères évalués <span class="aide">(un par ligne)</span></label>
-        <span class="espace"></span>
-        <button type="button" class="btn petit" id="criteres-defaut">Critères par défaut</button>
-      </div>
-      <textarea id="f-criteres" style="margin-top:6px">${esc(ev.criteres.map(c => c.libelle).join('\n'))}</textarea>
+      ${estNouvelle ? `
+        <div class="ligne" style="margin-top:14px">
+          <label for="f-modele" style="margin:0">Critères de la formation</label>
+          <span class="espace"></span>
+          <select id="f-modele" required class="choix-modele">
+            <option value="">— Choisir —</option>
+            ${modelesTries().map(m => `<option value="${m.id}">${esc(m.nom)}</option>`).join('')}
+            <option value="libre">Autre (saisie libre)</option>
+          </select>
+        </div>
+        <textarea id="f-criteres" style="margin-top:6px">${esc(ev.criteres.map(c => c.libelle).join('\n'))}</textarea>
+        <p class="aide">Un critère par ligne, modifiables pour cette session.
+          Les listes se gèrent dans la <a href="#/bibliotheque">bibliothèque des formations</a>.</p>`
+      : `
+        <label for="f-criteres">Critères évalués <span class="aide">(un par ligne)</span></label>
+        <textarea id="f-criteres">${esc(ev.criteres.map(c => c.libelle).join('\n'))}</textarea>`}
       ${verrouEchelle ? '<p class="aide">Supprimer un critère efface aussi ses notes déjà saisies.</p>' : ''}
 
       <div class="ligne" style="margin-top:16px">
@@ -420,9 +446,26 @@ function formulaireEvaluation(ev, estNouvelle) {
 
 function brancherFormulaire(ev, estNouvelle) {
   const echelle = document.getElementById('f-echelle');
-  document.getElementById('criteres-defaut').addEventListener('click', () => {
-    document.getElementById('f-criteres').value = CRITERES_PAR_DEFAUT.join('\n');
-  });
+  const choixModele = document.getElementById('f-modele');
+  if (choixModele) {
+    const titre = document.getElementById('f-titre');
+    let titreAuto = '';
+    const appliquerModele = () => {
+      const m = db.modeles.find(x => x.id === choixModele.value);
+      if (!m) return;
+      document.getElementById('f-criteres').value = m.criteres.join('\n');
+      // L'intitulé suit la formation tant qu'on ne l'a pas personnalisé.
+      if (!titre.value.trim() || titre.value === titreAuto) titre.value = titreAuto = m.nom;
+    };
+    choixModele.addEventListener('change', appliquerModele);
+    // Par défaut : la formation de la dernière évaluation, sinon la seule de la bibliothèque.
+    const derniere = db.evaluations[db.evaluations.length - 1];
+    const parDefaut = db.modeles.find(m => m.nom === derniere?.formation) || (db.modeles.length === 1 ? db.modeles[0] : null);
+    if (parDefaut) {
+      choixModele.value = parDefaut.id;
+      appliquerModele();
+    }
+  }
   const seuil = document.getElementById('f-seuil');
   const remplirSeuils = (valeur) => {
     const max = Number(echelle.value);
@@ -454,6 +497,7 @@ function brancherFormulaire(ev, estNouvelle) {
       for (const id of Object.keys(r.notes)) if (!ids.has(id)) delete r.notes[id];
     }
 
+    if (estNouvelle) ev.formation = db.modeles.find(m => m.id === choixModele.value)?.nom || '';
     ev.titre = document.getElementById('f-titre').value.trim();
     ev.date = document.getElementById('f-date').value;
     ev.formateur = document.getElementById('f-formateur').value.trim();
@@ -471,16 +515,17 @@ function brancherFormulaire(ev, estNouvelle) {
 function vueNouvelle() {
   const ev = {
     id: nouvelId(),
+    formation: '',
     titre: '',
     date: aujourdhui(),
     formateur: '',
     echelle: 5,
     seuil: SEUIL_PAR_DEFAUT[5],
     nbAttendu: null,
-    criteres: CRITERES_PAR_DEFAUT.map(l => ({ id: nouvelId(), libelle: l })),
+    criteres: [],
     reponses: [],
   };
-  // Toujours les critères par défaut ; échelle, seuil et formateur repris de la dernière évaluation.
+  // Critères : ceux de la formation choisie. Échelle, seuil et formateur : repris de la dernière évaluation.
   const derniere = db.evaluations[db.evaluations.length - 1];
   if (derniere) {
     ev.echelle = derniere.echelle;
@@ -809,19 +854,89 @@ function vueBilan(ev) {
   document.getElementById('csv-reponses').addEventListener('click', () => exporterReponsesCsv(ev));
 }
 
+// ---------- Bibliothèque des formations ----------
+
+function vueBibliotheque() {
+  const modeles = modelesTries();
+  const usages = (m) => db.evaluations.filter(ev => ev.formation === m.nom).length;
+  app.innerHTML = `
+    <h1>Bibliothèque des formations</h1>
+    <p class="aide">Chaque formation a sa liste de critères. Elle est proposée à la création d'une évaluation ;
+      la modifier ici ne change pas les évaluations déjà créées.</p>
+    ${modeles.length ? modeles.map(m => `
+      <a class="carte" href="#/bibliotheque/${m.id}">
+        <div><strong>${esc(m.nom)}</strong></div>
+        <div class="meta">${m.criteres.length} critère(s) · ${usages(m)} évaluation(s)</div>
+      </a>`).join('') : '<p class="vide">La bibliothèque est vide.</p>'}
+    <a class="btn principal flottant" href="#/bibliotheque/nouvelle">+ Nouvelle formation</a>
+  `;
+}
+
+function vueModele(id) {
+  const existant = db.modeles.find(m => m.id === id);
+  const m = existant || { id: nouvelId(), nom: '', criteres: [] };
+  app.innerHTML = `
+    <h1>${existant ? esc(m.nom) : 'Nouvelle formation'}</h1>
+    <form id="form-modele" class="carte">
+      <label for="m-nom">Nom de la formation</label>
+      <input type="text" id="m-nom" required value="${esc(m.nom)}" placeholder="ex. PAAP">
+      <label for="m-criteres">Critères <span class="aide">(un par ligne, dans l'ordre du questionnaire papier)</span></label>
+      <textarea id="m-criteres">${esc(m.criteres.join('\n'))}</textarea>
+      <div class="ligne" style="margin-top:16px">
+        <button type="submit" class="btn principal">Enregistrer</button>
+        <a class="btn" href="#/bibliotheque">Annuler</a>
+        <span class="espace"></span>
+        ${existant ? '<button type="button" class="btn danger" id="supprimer-modele">Supprimer</button>' : ''}
+      </div>
+    </form>
+  `;
+  document.getElementById('form-modele').addEventListener('submit', (e) => {
+    e.preventDefault();
+    const nom = document.getElementById('m-nom').value.trim();
+    const criteres = document.getElementById('m-criteres').value.split('\n').map(x => x.trim()).filter(Boolean);
+    if (!criteres.length) {
+      toast('Indiquez au moins un critère.');
+      return;
+    }
+    if (db.modeles.some(x => x.id !== m.id && x.nom.toLowerCase() === nom.toLowerCase())) {
+      toast(`La formation « ${nom} » existe déjà.`);
+      return;
+    }
+    // Les évaluations désignent leur formation par son nom : on suit un renommage.
+    if (existant && existant.nom !== nom) {
+      db.evaluations.forEach(ev => { if (ev.formation === existant.nom) ev.formation = nom; });
+    }
+    m.nom = nom;
+    m.criteres = criteres;
+    if (!existant) db.modeles.push(m);
+    enregistrer();
+    toast(`Formation « ${nom} » enregistrée`);
+    location.hash = '#/bibliotheque';
+  });
+  document.getElementById('supprimer-modele')?.addEventListener('click', async () => {
+    if (!await confirmer(`Supprimer « ${m.nom} » de la bibliothèque ? Les évaluations déjà créées sont conservées.`, { ok: 'Supprimer', danger: true })) return;
+    db.modeles = db.modeles.filter(x => x.id !== m.id);
+    enregistrer();
+    toast('Formation supprimée');
+    location.hash = '#/bibliotheque';
+  });
+}
+
 function vueSauvegarde() {
   const nb = db.evaluations.length;
   const nbRep = db.evaluations.reduce((t, e) => t + e.reponses.length, 0);
   app.innerHTML = `
     <h1>Sauvegarde</h1>
     <div class="carte">
-      <p>Les données sont stockées uniquement sur cet appareil : ${nb} évaluation(s), ${nbRep} questionnaire(s).
+      <p>Les données sont stockées uniquement sur cet appareil : ${nb} évaluation(s), ${nbRep} grille(s),
+      ${db.modeles.length} formation(s) en bibliothèque.
       Exportez régulièrement une sauvegarde, notamment avant de vider le navigateur ou de changer de téléphone.</p>
       <div class="ligne">
         <button class="btn principal" id="exporter">Exporter (JSON)</button>
         <label class="btn" style="margin:0">Importer…<input type="file" id="importer" accept=".json,application/json" hidden></label>
       </div>
-      <p class="aide">L'import ajoute les évaluations du fichier ; celles déjà présentes (même identifiant) sont remplacées.</p>
+      <p class="aide">L'import ajoute les évaluations et les formations du fichier ; celles déjà présentes
+      (même évaluation, ou formation de même nom) sont remplacées.</p>
     </div>
   `;
   document.getElementById('exporter').addEventListener('click', () => {
@@ -835,11 +950,15 @@ function vueSauvegarde() {
       if (!Array.isArray(donnees.evaluations)) throw new Error('format');
       const valides = donnees.evaluations.filter(ev =>
         ev && ev.id && Array.isArray(ev.criteres) && Array.isArray(ev.reponses) && ECHELLES.includes(ev.echelle)).map(normaliser);
-      if (!await confirmer(`Importer ${valides.length} évaluation(s) ?`, { ok: 'Importer' })) return;
+      const modeles = (Array.isArray(donnees.modeles) ? donnees.modeles : [])
+        .filter(m => m && m.id && m.nom && Array.isArray(m.criteres));
+      if (!await confirmer(`Importer ${valides.length} évaluation(s) et ${modeles.length} formation(s) ?`, { ok: 'Importer' })) return;
       const ids = new Set(valides.map(ev => ev.id));
       db.evaluations = db.evaluations.filter(ev => !ids.has(ev.id)).concat(valides);
+      const noms = new Set(modeles.map(m => m.nom.toLowerCase()));
+      db.modeles = db.modeles.filter(m => !noms.has(m.nom.toLowerCase())).concat(modeles);
       enregistrer();
-      toast(`${valides.length} évaluation(s) importée(s)`);
+      toast(`${valides.length} évaluation(s) et ${modeles.length} formation(s) importée(s)`);
       vueSauvegarde();
     } catch {
       toast('Fichier de sauvegarde illisible.');
@@ -854,6 +973,7 @@ function router() {
   window.scrollTo(0, 0);
   if (morceaux[0] === 'nouvelle') return vueNouvelle();
   if (morceaux[0] === 'sauvegarde') return vueSauvegarde();
+  if (morceaux[0] === 'bibliotheque') return morceaux[1] ? vueModele(morceaux[1]) : vueBibliotheque();
   if (morceaux[0] === 'eval') {
     const ev = trouverEvaluation(morceaux[1]);
     if (ev) {

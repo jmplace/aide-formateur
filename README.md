@@ -5,7 +5,9 @@ saisie rapide au téléphone, moyennes et taux de satisfaction par critère, exp
 
 ## Fonctionnalités
 
-- Une **évaluation** par session de formation : intitulé, date, formateur, critères (un par ligne),
+- Une **bibliothèque des formations** (ex. PAAP) : nom et liste des critères du questionnaire.
+- Une **évaluation** par session : formation choisie dans la bibliothèque (menu déroulant au-dessus
+  des critères, qu'elle remplit), intitulé, date, formateurs, critères (un par ligne, modifiables),
   échelle (1–4, 1–5 ou 1–10), seuil « satisfait à partir de » et, si on le connaît, le **nombre de grilles
   à saisir** (questionnaires papier reçus) : la saisie affiche alors l'avancement (« 5 / 12, reste 7 »)
   et demande confirmation au-delà.
