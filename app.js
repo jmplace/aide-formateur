@@ -170,7 +170,7 @@ function lireGrille(code, ev) {
     if ('-.#'.includes(c)) return null;
     const n = c === '0' && ev.echelle === 10 ? 10 : Number(c);
     if (!/^\d$/.test(c) || n < 1 || n > ev.echelle) {
-      throw new Error(`« ${c} » n'est pas une note valide (1 à ${ev.echelle}, ou - pour pas de note)`);
+      throw new Error(`« ${c} » n'est pas une note valide (1 à ${ev.echelle}, ou - ou # pour pas de note)`);
     }
     return n;
   };
@@ -605,7 +605,7 @@ function vueSaisie(ev, { focus = false } = {}) {
 
   const aideSyntaxe = `${ev.criteres.length} notes à la suite, ex. ${
     esc(codeGrille(Object.fromEntries(ev.criteres.map((c, i) => [c.id, ev.echelle - (i % 2)])), ev))
-  } ; *${caractereNote(ev.echelle)} = tout à ${ev.echelle} ; - = pas de note${ev.echelle === 10 ? ' ; 0 = 10' : ''} ; Entrée pour valider`;
+  } ; *${caractereNote(ev.echelle)} = tout à ${ev.echelle} ; - ou # = pas de note${ev.echelle === 10 ? ' ; 0 = 10' : ''} ; Entrée pour valider`;
 
   app.innerHTML = `
     <h1>${esc(ev.titre)}</h1>

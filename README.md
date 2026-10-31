@@ -16,7 +16,7 @@ saisie rapide au téléphone, moyennes et taux de satisfaction par critère, exp
     marque les feuilles ; on tape la grille directement sur sa ligne puis Entrée, ce qui enchaîne sur
     la grille vide suivante. Les grilles prévues mais pas encore saisies apparaissent comme lignes vides.
     Syntaxe : `5545543455` (un chiffre par critère, dans l'ordre), `*5` (tout à 5), `43*5`
-    (4, 3 puis 5 partout), `-` pour un critère sans note, `0` pour 10 sur l'échelle 1 à 10, espaces ignorés ;
+    (4, 3 puis 5 partout), `-` ou `#` pour un critère sans note, `0` pour 10 sur l'échelle 1 à 10, espaces ignorés ;
   - en dessous, le **détail** de la ligne sélectionnée (clic, ou flèches ↑↓) : notes de 5 à 1 par critère
     (5 à gauche, « Sans » = pas de note), modifiables aux boutons ;
   - une ligne modifiée apparaît en orange tant qu'elle n'est pas enregistrée : Entrée, le bouton, ou
