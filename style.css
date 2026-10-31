@@ -173,8 +173,9 @@ textarea { min-height: 300px; resize: vertical; }
 .ligne-grille.selection { background: var(--bleu-clair); box-shadow: inset 3px 0 0 var(--bleu); }
 .ligne-grille .lettre { min-width: 2.2em; text-align: center; font-weight: 700; font-size: 1.1rem; }
 .ligne-grille.vide .lettre { color: var(--gris); }
-.ligne-grille .place-bouton { width: 72px; flex: none; }
-.ligne-grille .btn { flex: none; width: 72px; }
+.ligne-grille .place-bouton { width: 40px; flex: none; }
+.ligne-grille .btn.supprimer { flex: none; width: 40px; padding: 0; font-size: 1rem; }
+.liste-grilles .ajouter-grille { display: flex; width: 100%; margin-top: 8px; border-style: dashed; }
 input.grille {
   flex: 1;
   min-width: 0;

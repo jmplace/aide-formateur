@@ -582,10 +582,14 @@ function vueSaisie(ev, { focus = false } = {}) {
   const parLettre = new Map(ev.reponses.map(r => [r.lettre, r]));
   const lettres = new Set(parLettre.keys());
   for (let i = 0; i < (ev.nbAttendu || 0); i++) lettres.add(lettreGrille(i));
-  lettres.add(prochaineLettre(ev));
+  // Sans nombre de grilles prévu, il reste toujours une ligne libre au bout de la liste.
+  if (!ev.nbAttendu) lettres.add(prochaineLettre(ev));
   const lignes = [...lettres].sort((a, b) => rangLettre(a) - rangLettre(b));
+  const premiereVide = () => lignes.find(l => !parLettre.has(l));
+  // Une ligne se supprime si elle est saisie ou prévue ; la ligne libre automatique, non.
+  const supprimable = (l) => parLettre.has(l) || rangLettre(l) < (ev.nbAttendu || 0);
 
-  if (!lignes.includes(selectionSaisie[ev.id])) selectionSaisie[ev.id] = prochaineLettre(ev);
+  if (!lignes.includes(selectionSaisie[ev.id])) selectionSaisie[ev.id] = premiereVide() || lignes[lignes.length - 1];
   let selection = selectionSaisie[ev.id];
 
   // Brouillon de chaque ligne : notes en cours d'édition et erreur de lecture éventuelle.
@@ -618,10 +622,12 @@ function vueSaisie(ev, { focus = false } = {}) {
           <input type="text" class="grille" data-lettre="${l}" value="${r ? esc(codeGrille(r.notes, ev)) : ''}"
                  placeholder="${r ? '' : 'à saisir'}" inputmode="tel" autocomplete="off" autocapitalize="off"
                  spellcheck="false" enterkeyhint="done" aria-label="Grille ${l}">
-          ${r ? `<button type="button" class="btn petit danger" data-retirer="${l}" title="Retirer la grille ${l}">Retirer</button>`
-              : '<span class="place-bouton"></span>'}
+          ${supprimable(l)
+            ? `<button type="button" class="btn petit danger supprimer" data-supprimer-grille="${l}" title="Supprimer la grille ${l}" aria-label="Supprimer la grille ${l}">✕</button>`
+            : '<span class="place-bouton"></span>'}
         </div>`;
       }).join('')}
+      ${ev.nbAttendu ? `<button type="button" class="btn petit ajouter-grille" id="ajouter-grille">+ Ajouter une grille (${lettreGrille(lignes.length)})</button>` : ''}
     </div>
 
     <div class="carte" id="detail">
@@ -700,11 +706,11 @@ function vueSaisie(ev, { focus = false } = {}) {
     montrer(l);
   };
 
-  /** Ligne à proposer après la validation de `l` : la première grille vide qui suit, sinon la prochaine lettre. */
+  /** Ligne à proposer après la validation de `l` : la première grille vide qui suit, sinon la ligne libre. */
   const ligneSuivante = (l) => {
     const prises = new Set(ev.reponses.map(r => r.lettre));
     const vide = lignes.find(x => rangLettre(x) > rangLettre(l) && !prises.has(x));
-    return vide || prochaineLettre(ev);
+    return vide || (ev.nbAttendu ? l : prochaineLettre(ev));
   };
 
   const valider = async (l) => {
@@ -717,7 +723,7 @@ function vueSaisie(ev, { focus = false } = {}) {
     }
     const manquants = ev.criteres.filter(c => !(c.id in notes)).length;
     if (manquants === ev.criteres.length) {
-      toast(r ? 'Grille vide : utilisez « Retirer » pour la supprimer.' : 'La grille est vide.');
+      toast(r ? 'Grille vide : utilisez ✕ pour la supprimer.' : 'La grille est vide.');
       return;
     }
     if (!r && ev.nbAttendu && ev.reponses.length >= ev.nbAttendu &&
@@ -774,15 +780,35 @@ function vueSaisie(ev, { focus = false } = {}) {
     });
   });
 
-  app.querySelectorAll('[data-retirer]').forEach(b => b.addEventListener('click', async () => {
-    const l = b.dataset.retirer;
-    if (!await confirmer(`Retirer la grille ${l} ? Elle redeviendra à saisir.`, { ok: 'Retirer', danger: true })) return;
-    ev.reponses = ev.reponses.filter(r => r.lettre !== l);
+  // Supprimer une grille : les grilles suivantes prennent la lettre précédente (D devient C…).
+  app.querySelectorAll('[data-supprimer-grille]').forEach(b => b.addEventListener('click', async () => {
+    const l = b.dataset.supprimerGrille;
+    const rang = rangLettre(l);
+    const r = parLettre.get(l);
+    const suivantes = ev.reponses.filter(x => rangLettre(x.lettre) > rang);
+    if (r || suivantes.length) {
+      const message = (r ? `Supprimer la grille ${l} (${codeGrille(r.notes, ev)}) ?` : `Supprimer la ligne vide ${l} ?`)
+        + (suivantes.length
+          ? ` Les grilles suivantes (${suivantes[0].lettre}${suivantes.length > 1 ? ` à ${suivantes[suivantes.length - 1].lettre}` : ''}) prendront la lettre précédente.`
+          : '');
+      if (!await confirmer(message, { ok: 'Supprimer', danger: true })) return;
+    }
+    ev.reponses = ev.reponses.filter(x => x !== r);
+    for (const x of suivantes) x.lettre = lettreGrille(rangLettre(x.lettre) - 1);
+    if (ev.nbAttendu) ev.nbAttendu = ev.nbAttendu - 1 || null;
     enregistrer();
-    toast(`Grille ${l} retirée`);
+    toast(r ? `Grille ${l} supprimée` : `Ligne ${l} supprimée`);
     selectionSaisie[ev.id] = l;
     vueSaisie(ev);
   }));
+
+  // Ajouter une grille : une ligne vide de plus en bout de liste (sans nombre prévu, la ligne libre en tient lieu).
+  document.getElementById('ajouter-grille')?.addEventListener('click', () => {
+    ev.nbAttendu = lignes.length + 1;
+    enregistrer();
+    selectionSaisie[ev.id] = lettreGrille(lignes.length);
+    vueSaisie(ev, { focus: true });
+  });
 
   // --- Détail : les boutons modifient la ligne sélectionnée ---
   app.querySelectorAll('.critere').forEach(bloc => {

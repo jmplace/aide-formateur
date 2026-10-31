@@ -20,7 +20,10 @@ saisie rapide au téléphone, moyennes et taux de satisfaction par critère, exp
   - en dessous, le **détail** de la ligne sélectionnée (clic, ou flèches ↑↓) : notes de 5 à 1 par critère
     (5 à gauche, « Sans » = pas de note), modifiables aux boutons ;
   - une ligne modifiée apparaît en orange tant qu'elle n'est pas enregistrée (Entrée ou bouton) ;
-    « Annuler » revient à la version enregistrée, « Retirer » supprime la grille, dont la ligne redevient à saisir.
+    « Annuler » revient à la version enregistrée ;
+  - **« + Ajouter une grille »** ajoute une ligne vide en fin de liste ; **✕** supprime une grille (ou une
+    ligne vide) et les grilles suivantes prennent la lettre précédente (D devient C…). Le nombre de grilles
+    à saisir suit ces ajouts et suppressions.
 
   Un critère sans note est exclu des moyennes.
 - **Comptage** : tableau une ligne par critère, une colonne par note (5 à 1) : nombre de grilles
