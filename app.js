@@ -701,10 +701,55 @@ function vueSaisie(ev, { focus = false } = {}) {
 
   const selectionner = (l) => {
     if (l === selection) return;
+    // Changer de ligne enregistre la ligne quittée (si elle est complète et valide).
+    if (enregistrerAuto(selection)) {
+      selectionSaisie[ev.id] = l;
+      vueSaisie(ev, { focus: true });
+      return;
+    }
     selection = selectionSaisie[ev.id] = l;
     majAffichage();
     montrer(l);
   };
+
+  /** Enregistre `notes` (complètes) pour la grille `l` ; renvoie le message à afficher. */
+  const enregistrerGrille = (l, notes) => {
+    const r = parLettre.get(l);
+    const complet = {};
+    for (const c of ev.criteres) complet[c.id] = notes[c.id] ?? null;
+    if (r) {
+      r.notes = complet;
+      r.modification = new Date().toISOString();
+    } else {
+      ev.reponses.push({ id: nouvelId(), lettre: l, saisie: new Date().toISOString(), notes: complet });
+      normaliser(ev);
+    }
+    enregistrer();
+    return r ? `Grille ${l} modifiée`
+      : ev.nbAttendu && ev.reponses.length === ev.nbAttendu ? `Les ${ev.nbAttendu} grilles sont saisies`
+      : `Grille ${l} enregistrée`;
+  };
+
+  /**
+   * Enregistrement sans question quand on quitte une ligne modifiée : seulement si la grille est
+   * complète et valide ; sinon elle reste en orange, non enregistrée. Renvoie vrai si enregistrée.
+   */
+  const enregistrerAuto = (l) => {
+    const b = brouillons[l];
+    if (!b) return false;
+    const r = parLettre.get(l);
+    const modifiee = r ? codeBrouillon(b.notes) !== codeGrille(r.notes, ev) : Object.keys(b.notes).length > 0;
+    if (!modifiee) return false;
+    const manquants = ev.criteres.filter(c => !(c.id in b.notes)).length;
+    if (b.erreur || manquants) {
+      toast(`Grille ${l} ${b.erreur ? 'invalide' : 'incomplète'} : non enregistrée`);
+      return false;
+    }
+    toast(enregistrerGrille(l, b.notes));
+    return true;
+  };
+  // En quittant l'écran (onglet, accueil…), la ligne en cours est enregistrée de la même façon.
+  avantDeQuitter = () => enregistrerAuto(selection);
 
   /** Ligne à proposer après la validation de `l` : la première grille vide qui suit, sinon la ligne libre. */
   const ligneSuivante = (l) => {
@@ -729,19 +774,7 @@ function vueSaisie(ev, { focus = false } = {}) {
     if (!r && ev.nbAttendu && ev.reponses.length >= ev.nbAttendu &&
         !await confirmer(`Les ${ev.nbAttendu} grilles prévues sont déjà saisies. Enregistrer quand même la grille ${l} ?`, { ok: 'Enregistrer' })) return;
     if (manquants && !await confirmer(`Grille ${l} : ${manquants} critère(s) non saisi(s), les compter comme « pas de note » ?`, { ok: 'Oui, sans note' })) return;
-    const complet = {};
-    for (const c of ev.criteres) complet[c.id] = notes[c.id] ?? null;
-    if (r) {
-      r.notes = complet;
-      r.modification = new Date().toISOString();
-    } else {
-      ev.reponses.push({ id: nouvelId(), lettre: l, saisie: new Date().toISOString(), notes: complet });
-      normaliser(ev);
-    }
-    enregistrer();
-    toast(r ? `Grille ${l} modifiée`
-      : ev.nbAttendu && ev.reponses.length === ev.nbAttendu ? `Les ${ev.nbAttendu} grilles sont saisies`
-      : `Grille ${l} enregistrée`);
+    toast(enregistrerGrille(l, notes));
     // On enchaîne sur la grille suivante, curseur prêt.
     selectionSaisie[ev.id] = ligneSuivante(l);
     vueSaisie(ev, { focus: true });
@@ -1068,7 +1101,15 @@ function vueSauvegarde() {
 
 // ---------- Routage ----------
 
+// Action à faire avant de quitter l'écran courant (posée par l'écran de saisie).
+let avantDeQuitter = null;
+
 function router() {
+  if (avantDeQuitter) {
+    const action = avantDeQuitter;
+    avantDeQuitter = null;
+    action();
+  }
   const morceaux = location.hash.replace(/^#\/?/, '').split('/');
   window.scrollTo(0, 0);
   if (morceaux[0] === 'nouvelle') return vueNouvelle();
